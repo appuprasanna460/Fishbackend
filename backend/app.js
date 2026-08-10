@@ -27,6 +27,7 @@ const seedRoutes = require('./routes/seedroutes');
 const invoiceTemplateRoutes = require('./routes/invoiceTemplateRoutes');
 const harbourRoutes = require('./routes/harbourroutes');
 const notificationRoutes = require('./routes/notificationroutes');
+const subscriptionPlanRoutes = require('./routes/subscriptionPlanRoutes');
 
 
 // Helper to wrap async handlers for Express 5
@@ -75,6 +76,7 @@ app.use('/api/fish-buyer-bills', fishBuyerBillRoutes);
 app.use('/api/templates', invoiceTemplateRoutes);
 app.use('/api/harbours', harbourRoutes);
 app.use('/api/notifications', notificationRoutes);
+app.use('/api/subscription-plans', subscriptionPlanRoutes);
 
 // Audit logging for all API routes
 app.use('/api', auditLog);
