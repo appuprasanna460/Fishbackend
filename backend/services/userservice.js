@@ -85,6 +85,7 @@ class UserService {
 
         if (filters.role) query.role = filters.role;
         if (filters.locationId) query.locationId = filters.locationId;
+        if (filters.harbourId) query.harbourId = filters.harbourId;
         if (filters.isActive !== undefined) query.isActive = filters.isActive;
 
         if (filters.search) {
@@ -132,6 +133,8 @@ class UserService {
         const user = await User.findById(userId)
             .select('-password -refreshTokens')
             .populate('agentId', 'name email')
+            .populate('harbourId', 'name')
+            .populate('subscriptionPlanId', 'name durationDays price')
             .lean();
 
         if (!user) {

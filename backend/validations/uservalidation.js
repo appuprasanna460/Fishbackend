@@ -100,6 +100,8 @@ const userListQuerySchema = Joi.object({
         .valid('SUPER_ADMIN', 'COMMISSION_AGENT', 'STAFF', 'FISH_BUYER', 'BOAT_OWNER'),
     locationId: Joi.string()
         .optional(),
+    harbourId: Joi.string()
+        .optional(),
     search: Joi.string()
         .min(1),
     isActive: Joi.boolean(),
