@@ -9,18 +9,19 @@ const subscriptionPlanSchema = new mongoose.Schema({
     },
     price: {
         type: Number,
-        required: true,
+        default: 0,
         min: 0
     },
+    // durationDays: number of days this plan is valid for (set by Super Admin, never hardcoded)
+    durationDays: {
+        type: Number,
+        required: true,
+        min: 1
+    },
+    // duration: free-text label for display purposes (e.g. 'Quarter', 'Half')
     duration: {
         type: String,
-        enum: ['QUARTERLY', 'HALF_YEARLY', 'YEARLY'],
-        required: true
-    },
-    billingCycle: {
-        type: String,
-        enum: ['QUARTERLY', 'HALF_YEARLY', 'YEARLY'],
-        default: function () { return this.duration; }
+        trim: true
     },
     features: [{
         type: String,
@@ -48,14 +49,14 @@ const subscriptionPlanSchema = new mongoose.Schema({
 
 // Indexes
 subscriptionPlanSchema.index({ isActive: 1, isDeleted: 1 });
-subscriptionPlanSchema.index({ duration: 1 });
+subscriptionPlanSchema.index({ durationDays: 1 });
 
 // Static method to get active plans
 subscriptionPlanSchema.statics.getActivePlans = function () {
     return this.find({
         isActive: true,
         isDeleted: false
-    }).sort({ price: 1 }).lean();
+    }).sort({ durationDays: 1 }).lean();
 };
 
 // Static method to get all plans (including inactive)

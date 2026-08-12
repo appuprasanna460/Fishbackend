@@ -111,9 +111,15 @@ const registerSchema = Joi.object({
     harbourId: Joi.string().hex().length(24).required().messages({
         'any.required': 'Harbour is required'
     }),
-    subscriptionPlan: Joi.string().valid('QUARTERLY', 'HALF_YEARLY', 'YEARLY').required().messages({
-        'any.only': 'Subscription plan must be QUARTERLY, HALF_YEARLY, or YEARLY',
+    // New dynamic plan reference — the ObjectId of the selected SubscriptionPlan
+    subscriptionPlanId: Joi.string().hex().length(24).required().messages({
+        'string.hex': 'Subscription plan must be a valid plan ID',
+        'string.length': 'Subscription plan must be a valid plan ID',
         'any.required': 'Subscription plan is required'
+    }),
+    // Legacy enum plan field — kept optional for backward compatibility with old clients
+    subscriptionPlan: Joi.string().valid('QUARTERLY', 'HALF_YEARLY', 'YEARLY').optional().messages({
+        'any.only': 'Subscription plan must be QUARTERLY, HALF_YEARLY, or YEARLY'
     })
 });
 

@@ -4,7 +4,7 @@ const logger = require('../config/logger');
 
 class SubscriptionPlanService {
     /**
-     * Get active plans (public - for registration)
+     * Get active plans (public - for registration and renewal)
      */
     async getActivePlans() {
         return SubscriptionPlan.getActivePlans();
@@ -22,12 +22,17 @@ class SubscriptionPlanService {
      */
     async createPlan(data, userId) {
         const plan = new SubscriptionPlan({
-            ...data,
+            name: data.name,
+            price: data.price || 0,
+            durationDays: data.durationDays,
+            duration: data.duration || data.name,  // free-text label
+            features: data.features || [],
+            isActive: data.isActive !== undefined ? data.isActive : true,
             createdBy: userId,
             updatedBy: userId
         });
         await plan.save();
-        logger.info(`Subscription plan created: ${plan.name} by user ${userId}`);
+        logger.info(`Subscription plan created: ${plan.name} (${plan.durationDays} days) by user ${userId}`);
         return plan;
     }
 
@@ -42,16 +47,14 @@ class SubscriptionPlanService {
 
         if (data.name !== undefined) plan.name = data.name.trim();
         if (data.price !== undefined) plan.price = data.price;
-        if (data.duration !== undefined) {
-            plan.duration = data.duration;
-            plan.billingCycle = data.duration;
-        }
+        if (data.durationDays !== undefined) plan.durationDays = data.durationDays;
+        if (data.duration !== undefined) plan.duration = data.duration;
         if (data.features !== undefined) plan.features = data.features;
         if (data.isActive !== undefined) plan.isActive = data.isActive;
         plan.updatedBy = userId;
 
         await plan.save();
-        logger.info(`Subscription plan updated: ${plan._id}`);
+        logger.info(`Subscription plan updated: ${plan._id} (${plan.durationDays} days)`);
         return plan;
     }
 
@@ -88,4 +91,4 @@ class SubscriptionPlanService {
     }
 }
 
-module.exports = new SubscriptionPlanService();
+module.exports = new SubscriptionPlanService();

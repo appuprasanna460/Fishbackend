@@ -28,6 +28,7 @@ const invoiceTemplateRoutes = require('./routes/invoiceTemplateRoutes');
 const harbourRoutes = require('./routes/harbourroutes');
 const notificationRoutes = require('./routes/notificationroutes');
 const subscriptionPlanRoutes = require('./routes/subscriptionPlanRoutes');
+const subscriptionRoutes = require('./routes/subscriptionRoutes');
 
 
 // Helper to wrap async handlers for Express 5
@@ -77,6 +78,7 @@ app.use('/api/templates', invoiceTemplateRoutes);
 app.use('/api/harbours', harbourRoutes);
 app.use('/api/notifications', notificationRoutes);
 app.use('/api/subscription-plans', subscriptionPlanRoutes);
+app.use('/api/subscription', subscriptionRoutes);
 
 // Audit logging for all API routes
 app.use('/api', auditLog);

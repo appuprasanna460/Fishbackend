@@ -26,8 +26,54 @@ const authenticate = async (req, res, next) => {
                 return errorResponse(res, 401, 'User no longer exists');
             }
 
+            // Allow expired users to still hit subscription endpoints (for renewal flow)
+            const isSubscriptionRoute = req.path.startsWith('/api/subscription') ||
+                req.originalUrl.includes('/subscription');
+
             if (!user.isActive || user.isDeleted) {
+                // Check if this is an expired subscription (not a banned account)
+                const hasExpiredSubscription = user.subscriptionEndDate &&
+                    new Date(user.subscriptionEndDate) < new Date() &&
+                    user.subscriptionStatus === 'EXPIRED';
+
+                if (hasExpiredSubscription && isSubscriptionRoute) {
+                    // Allow expired users through to subscription/renewal routes only
+                    req.user = user;
+                    req.userId = decoded.userId;
+                    req.token = token;
+                    return next();
+                }
+
+                if (hasExpiredSubscription) {
+                    return errorResponse(res, 403, 'Your subscription has expired. Please contact admin or request a renewal.', { code: 'SUBSCRIPTION_EXPIRED' });
+                }
+
                 return errorResponse(res, 401, 'User account is disabled');
+            }
+
+            // Check if subscription has expired on-the-fly (may not have been caught by scheduler yet)
+            if (user.role !== 'SUPER_ADMIN' && user.subscriptionEndDate) {
+                const now = new Date();
+                if (new Date(user.subscriptionEndDate) < now) {
+                    // Mark as expired in DB (non-blocking)
+                    User.findByIdAndUpdate(user._id, {
+                        subscriptionStatus: 'EXPIRED',
+                        isActive: false
+                    }).catch(err => logger.error('Failed to mark user expired:', err));
+
+                    if (isSubscriptionRoute) {
+                        // Allow through to renewal flow
+                        req.user = { ...user, subscriptionStatus: 'EXPIRED' };
+                        req.userId = decoded.userId;
+                        req.token = token;
+                        return next();
+                    }
+
+                    return errorResponse(res, 403,
+                        'Your subscription has expired. Please contact admin or request a renewal.',
+                        { code: 'SUBSCRIPTION_EXPIRED' }
+                    );
+                }
             }
 
             // Attach user to request

@@ -23,7 +23,7 @@ const login = async (req, res, next) => {
  */
 const register = async (req, res) => {
     try {
-        const { name, email, password, phone, companyName, referenceBy, role, harbourId, subscriptionPlan } = req.body;
+        const { name, email, password, phone, companyName, referenceBy, role, harbourId, subscriptionPlanId, subscriptionPlan } = req.body;
 
         // Check if email already exists
         const existing = await User.findByEmail(email);
@@ -37,11 +37,14 @@ const register = async (req, res) => {
             email: email.trim().toLowerCase(),
             password,
             phone,
-            companyName: companyName.trim(),
+            companyName: companyName ? companyName.trim() : '',
             referenceBy: referenceBy ? referenceBy.trim() : undefined,
             role,
             harbourId,
-            subscriptionPlan,
+            // Store dynamic plan reference (new) and legacy plan string (backward compat)
+            subscriptionPlanId: subscriptionPlanId || undefined,
+            subscriptionPlan: subscriptionPlan || 'NONE',
+            subscriptionStatus: 'PENDING_APPROVAL',
             isApproved: false,
             isActive: false
         });
@@ -51,7 +54,8 @@ const register = async (req, res) => {
         await Notification.create({
             userId: user._id,
             type: 'NEW_USER_REGISTRATION',
-            message: `New registration request from ${name} (${role.replace('_', ' ')}) - ${email}`
+            title: 'New Registration Request',
+            message: `New registration request from ${name} (${role.replace(/_/g, ' ')}) - ${email}`
         });
 
         logger.info(`New self-registration: ${email} (${role})`);

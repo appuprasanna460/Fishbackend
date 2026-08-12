@@ -54,15 +54,43 @@ const userSchema = new mongoose.Schema({
         type: String,
         trim: true
     },
+    // Legacy enum plan field — kept for backward compat with existing users
     subscriptionPlan: {
         type: String,
-        enum: ['QUARTERLY', 'HALF_YEARLY', 'YEARLY', 'NONE'],
+        default: 'NONE'
+    },
+    // New dynamic plan reference (set when user registers with a plan ObjectId)
+    subscriptionPlanId: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'SubscriptionPlan'
+    },
+    // Snapshot of plan name at approval time (for display even if plan is later edited/deleted)
+    subscriptionPlanName: {
+        type: String,
+        trim: true
+    },
+    // Snapshot of duration in days at approval time
+    subscriptionDurationDays: {
+        type: Number
+    },
+    // Subscription lifecycle status
+    subscriptionStatus: {
+        type: String,
+        enum: ['PENDING_APPROVAL', 'ACTIVE', 'EXPIRING_SOON', 'EXPIRED', 'NONE'],
         default: 'NONE'
     },
     subscriptionStartDate: {
         type: Date
     },
     subscriptionEndDate: {
+        type: Date
+    },
+    // Who approved the subscription and when
+    subscriptionApprovedBy: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'User'
+    },
+    subscriptionApprovedAt: {
         type: Date
     },
     isApproved: {

@@ -3,7 +3,6 @@ const router = express.Router();
 const authController = require('../controllers/authcontroller');
 const { authenticate } = require('../middleware/authmiddleware');
 const { validate } = require('../middleware/validatemiddleware');
-const { authLimiter } = require('../middleware/rateLimiter');
 const {
     loginSchema,
     refreshTokenSchema,
@@ -11,11 +10,11 @@ const {
     registerSchema
 } = require('../validations/authvalidation');
 
-// Public routes with rate limiting
-router.post('/login', authLimiter, validate(loginSchema), authController.login);
+// Public routes
+router.post('/login', validate(loginSchema), authController.login);
 router.post('/refresh', validate(refreshTokenSchema), authController.refresh);
 // ✅ NEW: Public self-registration
-router.post('/register', authLimiter, validate(registerSchema), authController.register);
+router.post('/register', validate(registerSchema), authController.register);
 
 // Protected routes
 router.post('/logout', authenticate, authController.logout);

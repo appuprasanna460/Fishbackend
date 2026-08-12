@@ -2,6 +2,7 @@ const app = require('./app');
 const env = require('./config/env');
 const logger = require('./config/logger');
 const database = require('./config/db');
+const { startSubscriptionScheduler } = require('./services/subscriptionScheduler');
 
 const PORT = env.port;
 
@@ -10,6 +11,9 @@ const startServer = async () => {
     try {
         // Connect to MongoDB
         await database.connect();
+
+        // Start subscription scheduler (expiry detection + warning notifications)
+        startSubscriptionScheduler();
 
         // Start server
         const server = app.listen(PORT, '0.0.0.0', () => {
