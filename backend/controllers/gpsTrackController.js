@@ -42,9 +42,31 @@ const getTrackSummary = async (req, res) => {
     }
 };
 
+const getTrackHistory = async (req, res) => {
+    try {
+        const history = await gpsTrackService.getTrackHistory(req.user._id, req.query);
+        successResponse(res, 200, 'GPS track history retrieved successfully', history);
+    } catch (error) {
+        logger.error('Get track history error:', error);
+        errorResponse(res, 500, error.message || 'Failed to retrieve GPS track history');
+    }
+};
+
+const getVoyageTrackDetail = async (req, res) => {
+    try {
+        const detail = await gpsTrackService.getVoyageTrackDetail(req.params.voyageId, req.user._id);
+        successResponse(res, 200, 'Voyage GPS track detail retrieved successfully', detail);
+    } catch (error) {
+        logger.error('Get voyage track detail error:', error);
+        errorResponse(res, 404, error.message || 'Failed to retrieve voyage GPS track details');
+    }
+};
+
 module.exports = {
     getTracksByVoyage,
     getTracksByHaul,
     getTracks,
-    getTrackSummary
+    getTrackSummary,
+    getTrackHistory,
+    getVoyageTrackDetail
 };

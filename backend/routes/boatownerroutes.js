@@ -288,6 +288,11 @@ router.get('/fishing-grounds/history', fishingGroundController.getGroundHistory)
 router.put('/fishing-grounds/:id/favourite', validate(idParamSchema, 'params'), fishingGroundController.toggleFavourite);
 
 // ─── GPS Track Routes ─────────────────────────────────────────────────────────
+// History list (summary, with trackPreview, supports ?period=today|week|month)
+router.get('/gps-tracks/history', gpsTrackController.getTrackHistory);
+// Full voyage detail (complete GPS track for map view)
+router.get('/gps-tracks/voyage/:voyageId/detail', gpsTrackController.getVoyageTrackDetail);
+// By voyage / haul (raw haul-level tracks)
 router.get('/gps-tracks/voyage/:voyageId', gpsTrackController.getTracksByVoyage);
 router.get('/gps-tracks/haul/:haulId', gpsTrackController.getTracksByHaul);
 router.get('/gps-tracks', gpsTrackController.getTracks);
