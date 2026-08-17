@@ -24,6 +24,10 @@ class FishService {
             // FISH_BUYER: agentId = null, isGlobal = true
             agentId = null;
             isGlobal = true;
+        } else if (user.role === 'BOAT_OWNER') {
+            // BOAT_OWNER: agentId = null, isGlobal = false (scoped to owner)
+            agentId = null;
+            isGlobal = false;
         } else if (user.role === 'COMMISSION_AGENT' || user.role === 'SUPER_ADMIN') {
             // Agent/Admin: use provided agentId or their own ID
             agentId = fishData.agentId || user._id.toString();
@@ -41,7 +45,7 @@ class FishService {
             }
             isGlobal = false;
         } else {
-            throw new Error('Only FISH_BUYER, COMMISSION_AGENT, or SUPER_ADMIN can create fish');
+            throw new Error('Only FISH_BUYER, BOAT_OWNER, COMMISSION_AGENT, or SUPER_ADMIN can create fish');
         }
 
         // Check if fish already exists
@@ -102,6 +106,7 @@ class FishService {
         if (filters.agentId) query.agentId = filters.agentId;
         if (filters.category) query.category = filters.category.toUpperCase();
         if (filters.isActive !== undefined) query.isActive = filters.isActive;
+        if (filters.ownerId) query.createdBy = filters.ownerId;
 
         if (filters.search) {
             query.$or = [
@@ -229,8 +234,8 @@ class FishService {
         const fishCreatedBy = fish.createdBy ? fish.createdBy.toString() : null;
 
         // Check permissions based on role
-        if (user.role === 'FISH_BUYER') {
-            // FISH_BUYER can only delete their own fish
+        if (user.role === 'FISH_BUYER' || user.role === 'BOAT_OWNER') {
+            // FISH_BUYER and BOAT_OWNER can only delete their own fish
             if (!fishCreatedBy || fishCreatedBy !== userId) {
                 throw new Error('You can only delete fish you created');
             }
@@ -362,6 +367,10 @@ class FishService {
                     { isGlobal: true },
                     { createdBy: user._id }
                 ];
+                break;
+            case 'BOAT_OWNER':
+                // BOAT_OWNER only sees fish created by them
+                query.createdBy = user._id;
                 break;
             case 'STAFF':
                 if (user.agentId) {

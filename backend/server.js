@@ -3,6 +3,7 @@ const env = require('./config/env');
 const logger = require('./config/logger');
 const database = require('./config/db');
 const { startSubscriptionScheduler } = require('./services/subscriptionScheduler');
+const { startVoyageScheduler } = require('./services/voyageScheduler');
 
 const PORT = env.port;
 
@@ -14,6 +15,9 @@ const startServer = async () => {
 
         // Start subscription scheduler (expiry detection + warning notifications)
         startSubscriptionScheduler();
+
+        // Start voyage auto-completion scheduler
+        startVoyageScheduler();
 
         // Start server
         const server = app.listen(PORT, '0.0.0.0', () => {

@@ -1,0 +1,282 @@
+const Voyage = require('../models/voyageModel');
+const Crew = require('../models/crewModel');
+const Boat = require('../models/boatmodel');
+const Bill = require('../models/billmodel');
+
+class VoyageService {
+    // Create a new voyage (auto-assigns ownerId from logged-in user)
+    async createVoyage(data, ownerId) {
+        if (!data.endDate && data.departureDate && data.expectedDuration) {
+            const endDate = new Date(data.departureDate);
+            if (data.expectedDuration === '5-7_DAYS') {
+                endDate.setDate(endDate.getDate() + 7);
+            } else if (data.expectedDuration === '8-9_DAYS') {
+                endDate.setDate(endDate.getDate() + 9);
+            } else {
+                endDate.setDate(endDate.getDate() + 7);
+            }
+            data.endDate = endDate;
+        }
+
+        const voyage = new Voyage({
+            ...data,
+            ownerId,
+            status: 'PLANNED'
+        });
+
+        await voyage.save();
+
+        // Lock crew members availability
+        const allAssignedCrew = [voyage.captainId, ...voyage.crewMembers];
+        await Crew.updateMany(
+            { _id: { $in: allAssignedCrew } },
+            { 
+                $set: { 
+                    isAvailable: false, 
+                    assignedTo: { 
+                        voyageId: voyage._id, 
+                        boatId: voyage.boatId, 
+                        assignedAt: new Date() 
+                    } 
+                } 
+            }
+        );
+
+        return voyage;
+    }
+
+    // Get all voyages for a Boat Owner with filters
+    async getVoyages(ownerId, filters = {}) {
+        const query = { ownerId, isDeleted: false };
+
+        if (filters.status) {
+            query.status = filters.status;
+        }
+
+        if (filters.boatId) {
+            query.boatId = filters.boatId;
+        }
+
+        if (filters.dateRange) {
+            const { from, to } = JSON.parse(filters.dateRange);
+            query.departureDate = {
+                $gte: new Date(from),
+                $lte: new Date(to)
+            };
+        }
+
+        if (filters.search) {
+            // Find boats matching search to filter by boat names
+            const matchingBoats = await Boat.find({
+                ownerId,
+                boatName: { $regex: filters.search, $options: 'i' },
+                isDeleted: false
+            }).select('_id');
+            const boatIds = matchingBoats.map(b => b._id);
+
+            query.$or = [
+                { boatId: { $in: boatIds } },
+                { notes: { $regex: filters.search, $options: 'i' } }
+            ];
+        }
+
+        return await Voyage.find(query)
+            .populate('boatId', 'boatName boatNumber registrationNumber capacity')
+            .populate('captainId', 'name phone location')
+            .populate('crewMembers', 'name phone role')
+            .populate('departureHarbour', 'harbourName')
+            .populate('targetSpecies', 'name pricePerKg')
+            .sort({ departureDate: -1 })
+            .lean();
+    }
+
+    // Get a single voyage by ID (with ownership check)
+    async getVoyageById(id, ownerId) {
+        const voyage = await Voyage.findOne({ _id: id, ownerId, isDeleted: false })
+            .populate('boatId', 'boatName boatNumber registrationNumber capacity')
+            .populate('captainId', 'name phone location experience notes')
+            .populate('crewMembers', 'name phone role location age experience notes')
+            .populate('departureHarbour', 'harbourName code')
+            .populate('targetSpecies', 'name localName category pricePerKg');
+
+        if (!voyage) {
+            throw new Error('Voyage not found or access denied');
+        }
+        return voyage;
+    }
+
+    // Update a voyage (with ownership check and crew availability handling)
+    async updateVoyage(id, data, ownerId) {
+        const voyage = await Voyage.findOne({ _id: id, ownerId, isDeleted: false });
+        if (!voyage) {
+            throw new Error('Voyage not found or access denied');
+        }
+
+        if (voyage.status === 'COMPLETED' || voyage.status === 'CANCELLED') {
+            throw new Error('Completed or cancelled voyages cannot be edited');
+        }
+
+        const oldCrew = [voyage.captainId.toString(), ...voyage.crewMembers.map(c => c.toString())];
+        
+        let updateFields = {};
+        
+        if (voyage.status === 'ACTIVE') {
+            // Limited edit for ACTIVE: notes and supplies only
+            const { notes, supplies } = data;
+            if (notes !== undefined) updateFields.notes = notes;
+            if (supplies !== undefined) updateFields.supplies = supplies;
+        } else {
+            // Full edit for PLANNED
+            const { status, startedAt, completedAt, cancelledAt, ...allUpdateFields } = data;
+            updateFields = allUpdateFields;
+        }
+        
+        Object.assign(voyage, updateFields);
+        await voyage.save();
+
+        const newCrew = [voyage.captainId.toString(), ...voyage.crewMembers.map(c => c.toString())];
+
+        // Release crew members that are no longer part of this voyage
+        const releasedCrew = oldCrew.filter(c => !newCrew.includes(c));
+        if (releasedCrew.length > 0) {
+            await Crew.updateMany(
+                { _id: { $in: releasedCrew } },
+                { $set: { isAvailable: true, assignedTo: null } }
+            );
+        }
+
+        // Lock newly assigned crew members
+        const reservedCrew = newCrew.filter(c => !oldCrew.includes(c));
+        if (reservedCrew.length > 0) {
+            await Crew.updateMany(
+                { _id: { $in: reservedCrew } },
+                { 
+                    $set: { 
+                        isAvailable: false, 
+                        assignedTo: { 
+                            voyageId: voyage._id, 
+                            boatId: voyage.boatId, 
+                            assignedAt: new Date() 
+                        } 
+                    } 
+                }
+            );
+        }
+
+        return voyage;
+    }
+
+    // Update voyage status (Start/Cancel/Complete)
+    async updateVoyageStatus(id, status, ownerId) {
+        const voyage = await Voyage.findOne({ _id: id, ownerId, isDeleted: false });
+        if (!voyage) {
+            throw new Error('Voyage not found or access denied');
+        }
+
+        const validTransitions = {
+            'PLANNED': ['ACTIVE', 'CANCELLED'],
+            'ACTIVE': ['COMPLETED', 'CANCELLED'],
+            'COMPLETED': [],
+            'CANCELLED': []
+        };
+
+        if (!validTransitions[voyage.status].includes(status)) {
+            throw new Error(`Cannot transition voyage status from ${voyage.status} to ${status}`);
+        }
+
+        voyage.status = status;
+        const allCrew = [voyage.captainId, ...voyage.crewMembers];
+
+        if (status === 'ACTIVE') {
+            voyage.startedAt = new Date();
+            // Lock crew
+            await Crew.updateMany(
+                { _id: { $in: allCrew } },
+                { 
+                    $set: { 
+                        isAvailable: false, 
+                        assignedTo: { 
+                            voyageId: voyage._id, 
+                            boatId: voyage.boatId, 
+                            assignedAt: new Date() 
+                        } 
+                    } 
+                }
+            );
+        } else if (status === 'COMPLETED') {
+            voyage.completedAt = new Date();
+            // Release crew
+            await Crew.updateMany(
+                { _id: { $in: allCrew } },
+                { $set: { isAvailable: true, assignedTo: null } }
+            );
+        } else if (status === 'CANCELLED') {
+            voyage.cancelledAt = new Date();
+            // Release crew
+            await Crew.updateMany(
+                { _id: { $in: allCrew } },
+                { $set: { isAvailable: true, assignedTo: null } }
+            );
+        }
+
+        await voyage.save();
+        return voyage;
+    }
+
+    // Delete a voyage (soft delete - with ownership check)
+    async deleteVoyage(id, ownerId) {
+        const voyage = await Voyage.findOneAndUpdate(
+            { _id: id, ownerId, isDeleted: false },
+            { $set: { isDeleted: true } },
+            { new: true }
+        );
+
+        if (!voyage) {
+            throw new Error('Voyage not found or access denied');
+        }
+
+        // Release crew if they were locked onto this deleted voyage
+        const allCrew = [voyage.captainId, ...voyage.crewMembers];
+        await Crew.updateMany(
+            { _id: { $in: allCrew }, 'assignedTo.voyageId': voyage._id },
+            { $set: { isAvailable: true, assignedTo: null } }
+        );
+
+        return voyage;
+    }
+
+    // Get voyage statistics for dashboard
+    async getVoyageStats(ownerId) {
+        const activeVoyages = await Voyage.countDocuments({ ownerId, status: 'ACTIVE', isDeleted: false });
+        
+        // Boats at sea: count unique boats of active voyages
+        const activeVoyageBoats = await Voyage.distinct('boatId', { ownerId, status: 'ACTIVE', isDeleted: false });
+        const boatsAtSea = activeVoyageBoats.length;
+
+        // Today's Sales calculation (sum confirm bills matching owner boats)
+        const boats = await Boat.find({ ownerId, isDeleted: false }).select('_id').lean();
+        const boatIds = boats.map(b => b._id);
+
+        const todayStart = new Date();
+        todayStart.setHours(0, 0, 0, 0);
+        const todayEnd = new Date();
+        todayEnd.setHours(23, 59, 59, 999);
+
+        const todayBills = await Bill.find({
+            boatId: { $in: boatIds },
+            billDate: { $gte: todayStart, $lte: todayEnd },
+            status: 'CONFIRMED',
+            isDeleted: false
+        }).lean();
+
+        const todaySales = todayBills.reduce((acc, bill) => acc + (bill.grandTotal || 0), 0);
+
+        return {
+            activeVoyages,
+            boatsAtSea,
+            todaySales
+        };
+    }
+}
+
+module.exports = new VoyageService();

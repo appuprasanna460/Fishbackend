@@ -42,7 +42,12 @@ const getFish = async (req, res, next) => {
         const { page, limit, skip } = getPaginationParams(req.query);
         const sort = getSortParams(req.query, 'name', 'asc');
 
-        const { data, total } = await fishService.getFish(req.query, { page, limit, skip, sort }, req.user);
+        const filters = { ...req.query };
+        if (req.user && req.user.role === 'BOAT_OWNER') {
+            filters.ownerId = req.user._id.toString();
+        }
+
+        const { data, total } = await fishService.getFish(filters, { page, limit, skip, sort }, req.user);
         paginatedResponse(res, 200, 'Fish retrieved successfully', data, buildPaginationMeta(total, page, limit));
     } catch (error) {
         logger.error('Get fish error:', error);
@@ -70,7 +75,8 @@ const updateFish = async (req, res, next) => {
     try {
         const fish = await fishService.getFishById(req.params.id, req.user);
 
-        if (req.user.role === 'FISH_BUYER' && fish.agentId.toString() !== req.user._id.toString()) {
+        if ((req.user.role === 'FISH_BUYER' || req.user.role === 'BOAT_OWNER') && 
+            (!fish.createdBy || (fish.createdBy._id || fish.createdBy).toString() !== req.user._id.toString())) {
             return errorResponse(res, 403, 'You can only update fish you created');
         }
 
