@@ -139,6 +139,51 @@ class CatchService {
         }));
     }
 
+    // Full voyage catch summary: species breakdown (with share%) + per-haul breakdown
+    async getCatchSummaryByVoyage(voyageId, ownerId) {
+        const catches = await Catch.find({ voyageId, ownerId }).populate('haulId', 'haulNumber').lean();
+
+        const totalWeight = catches.reduce((sum, c) => sum + c.weight, 0);
+
+        // --- By species ---
+        const speciesMap = {};
+        for (const c of catches) {
+            if (!speciesMap[c.species]) {
+                speciesMap[c.species] = { weight: 0, boxes: 0 };
+            }
+            speciesMap[c.species].weight += c.weight;
+            speciesMap[c.species].boxes += c.boxes;
+        }
+        const bySpecies = Object.keys(speciesMap).map(species => ({
+            species,
+            weight: speciesMap[species].weight,
+            boxes: speciesMap[species].boxes,
+            sharePercent: totalWeight > 0
+                ? Math.round((speciesMap[species].weight / totalWeight) * 100)
+                : 0,
+        }));
+
+        // --- By haul ---
+        const haulMap = {};
+        for (const c of catches) {
+            const haulNum = c.haulId?.haulNumber ?? '?';
+            const haulKey = `${c.haulId?._id ?? 'unknown'}`;
+            if (!haulMap[haulKey]) {
+                haulMap[haulKey] = { haulNumber: haulNum, weight: 0, boxes: 0 };
+            }
+            haulMap[haulKey].weight += c.weight;
+            haulMap[haulKey].boxes += c.boxes;
+        }
+        const byHaul = Object.values(haulMap).map(h => ({
+            haulNumber: h.haulNumber,
+            weight: h.weight,
+            boxes: h.boxes,
+            sharePercent: totalWeight > 0 ? Math.round((h.weight / totalWeight) * 100) : 0,
+        })).sort((a, b) => a.haulNumber - b.haulNumber);
+
+        return { totalWeight, bySpecies, byHaul };
+    }
+
     // Check if haul has pending catch (STOPPED or COMPLETED haul with 0 catches)
     async hasPendingCatch(haulId) {
         const haul = await Haul.findById(haulId);

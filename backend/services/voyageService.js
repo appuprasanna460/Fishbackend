@@ -121,10 +121,11 @@ class VoyageService {
         let updateFields = {};
         
         if (voyage.status === 'ACTIVE') {
-            // Limited edit for ACTIVE: notes and supplies only
-            const { notes, supplies } = data;
+            // Limited edit for ACTIVE: notes, supplies and checklist
+            const { notes, supplies, checklist } = data;
             if (notes !== undefined) updateFields.notes = notes;
             if (supplies !== undefined) updateFields.supplies = supplies;
+            if (checklist !== undefined) updateFields.checklist = checklist;
         } else {
             // Full edit for PLANNED
             const { status, startedAt, completedAt, cancelledAt, ...allUpdateFields } = data;
@@ -133,6 +134,21 @@ class VoyageService {
         
         Object.assign(voyage, updateFields);
         await voyage.save();
+
+        if (updateFields.checklist !== undefined) {
+            const VoyageChecklist = require('../models/voyageChecklistModel');
+            await VoyageChecklist.findOneAndUpdate(
+                { voyageId: id },
+                {
+                    $set: {
+                        boatId: voyage.boatId,
+                        ownerId,
+                        checklist: updateFields.checklist
+                    }
+                },
+                { upsert: true }
+            );
+        }
 
         const newCrew = [voyage.captainId.toString(), ...voyage.crewMembers.map(c => c.toString())];
 

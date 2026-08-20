@@ -12,6 +12,10 @@ const haulController = require('../controllers/haulController');
 const catchController = require('../controllers/catchController');
 const fishingGroundController = require('../controllers/fishingGroundController');
 const gpsTrackController = require('../controllers/gpsTrackController');
+const voyageExpenseController = require('../controllers/voyageExpenseController');
+const returnEntryController = require('../controllers/returnEntryController');
+const landingEntryController = require('../controllers/landingEntryController');
+const voyageChecklistController = require('../controllers/voyageChecklistController');
 // ─── Validation Schemas ───────────────────────────────────────────────────────
 
 const objectId = Joi.string()
@@ -167,6 +171,7 @@ const updateVoyageSchema = Joi.object({
         foodSupplies: Joi.string().allow('', null),
         otherSupplies: Joi.string().allow('', null)
     }),
+    checklist: Joi.object().unknown(true).allow(null),
     notes: Joi.string().allow('', null)
 }).min(1);
 
@@ -260,6 +265,34 @@ router.get('/voyages/:id', validate(idParamSchema, 'params'), voyageController.g
 router.put('/voyages/:id', validate(idParamSchema, 'params'), validate(updateVoyageSchema), voyageController.updateVoyage);
 router.put('/voyages/:id/status', validate(idParamSchema, 'params'), validate(updateVoyageStatusSchema), voyageController.updateVoyageStatus);
 router.delete('/voyages/:id', validate(idParamSchema, 'params'), voyageController.deleteVoyage);
+
+// ─── Catch Summary (voyage-level) ─────────────────────────────────────────────
+router.get('/voyages/:voyageId/catch-summary', catchController.getCatchSummaryByVoyage);
+
+// ─── Voyage Expenses ──────────────────────────────────────────────────────────
+const saveExpenseSchema = Joi.object({
+    voyageId: objectId.required(),
+    boatId: objectId.required(),
+    date: Joi.date().required(),
+    fuelUsed: Joi.number().min(0).default(0),
+    iceUsed: Joi.number().min(0).default(0),
+    waterUsed: Joi.number().min(0).default(0),
+    notes: Joi.string().allow('', null),
+});
+router.get('/voyage-expenses/:voyageId', voyageExpenseController.getVoyageExpenses);
+router.post('/voyage-expenses', validate(saveExpenseSchema), voyageExpenseController.saveVoyageExpenses);
+
+// ─── Return Entry Routes ───
+router.get('/voyages/:voyageId/return-entry', returnEntryController.getReturnEntry);
+router.post('/voyages/:voyageId/return-entry', returnEntryController.saveReturnEntry);
+
+// ─── Landing Entry Routes ───
+router.get('/voyages/:voyageId/landing-entry', landingEntryController.getLandingEntry);
+router.post('/voyages/:voyageId/landing-entry', landingEntryController.saveLandingEntry);
+
+// ─── Voyage Checklist Routes ───
+router.get('/voyages/:voyageId/checklist-details', voyageChecklistController.getChecklist);
+router.post('/voyages/:voyageId/checklist-details', voyageChecklistController.saveChecklist);
 
 // ─── Fish Routes ──────────────────────────────────────────────────────────────
 router.get('/fish', fishController.getFish);

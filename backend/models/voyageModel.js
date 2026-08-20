@@ -98,6 +98,11 @@ const voyageSchema = new mongoose.Schema({
             default: ''
         }
     },
+    checklist: {
+        type: Map,
+        of: String,
+        default: {}
+    },
     notes: {
         type: String,
         trim: true,

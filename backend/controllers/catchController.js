@@ -52,6 +52,19 @@ const deleteCatch = async (req, res) => {
     }
 };
 
+// Voyage-level catch summary: species breakdown + per-haul breakdown
+const getCatchSummaryByVoyage = async (req, res) => {
+    try {
+        const { voyageId } = req.params;
+        const ownerId = req.user._id;
+        const summary = await catchService.getCatchSummaryByVoyage(voyageId, ownerId);
+        successResponse(res, 200, 'Catch summary retrieved successfully', summary);
+    } catch (error) {
+        logger.error('Get catch summary by voyage error:', error);
+        errorResponse(res, 500, error.message || 'Failed to retrieve catch summary');
+    }
+};
+
 const hasPendingCatch = async (req, res) => {
     try {
         const isPending = await catchService.hasPendingCatch(req.params.haulId);
@@ -68,5 +81,6 @@ module.exports = {
     getCatchById,
     updateCatch,
     deleteCatch,
-    hasPendingCatch
+    hasPendingCatch,
+    getCatchSummaryByVoyage
 };
