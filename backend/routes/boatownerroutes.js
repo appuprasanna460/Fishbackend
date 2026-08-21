@@ -16,6 +16,7 @@ const voyageExpenseController = require('../controllers/voyageExpenseController'
 const returnEntryController = require('../controllers/returnEntryController');
 const landingEntryController = require('../controllers/landingEntryController');
 const voyageChecklistController = require('../controllers/voyageChecklistController');
+const financialController = require('../controllers/financialController');
 // ─── Validation Schemas ───────────────────────────────────────────────────────
 
 const objectId = Joi.string()
@@ -330,5 +331,17 @@ router.get('/gps-tracks/voyage/:voyageId', gpsTrackController.getTracksByVoyage)
 router.get('/gps-tracks/haul/:haulId', gpsTrackController.getTracksByHaul);
 router.get('/gps-tracks', gpsTrackController.getTracks);
 router.get('/gps-tracks/summary/:voyageId', gpsTrackController.getTrackSummary);
+
+// ─── Financial Management Routes ─────────────────────────────────────────────
+router.get('/financial/dashboard', financialController.getFinancialDashboard);
+router.get('/financial/voyages', financialController.getVoyagesPLList);
+router.get('/financial/voyages/:voyageId', financialController.getVoyagePLSummary);
+router.put('/financial/voyages/:voyageId/income', financialController.upsertCatchRates);
+router.post('/financial/voyages/:voyageId/other-income', financialController.addOtherIncome);
+router.delete('/financial/voyages/:voyageId/other-income/:id', financialController.deleteOtherIncome);
+router.put('/financial/voyages/:voyageId/expenses', financialController.upsertVoyageExpenses);
+router.post('/financial/voyages/:voyageId/custom-expenses', financialController.addCustomExpense);
+router.delete('/financial/voyages/:voyageId/custom-expenses/:id', financialController.deleteCustomExpense);
+router.put('/financial/voyages/:voyageId/crew-settlement', financialController.upsertCrewSettlement);
 
 module.exports = router;

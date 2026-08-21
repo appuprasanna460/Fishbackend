@@ -37,6 +37,13 @@ module.exports = {
         windowMs: parseInt(process.env.RATE_LIMIT_WINDOW_MS) || 900000,
         max: parseInt(process.env.AUTH_RATE_LIMIT_MAX) || 5
     },
+    aws: {
+        accessKeyId: process.env.AWS_ACCESS_KEY_ID,
+        secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY,
+        region: process.env.AWS_S3_REGION || 'ap-south-1',
+        bucket: process.env.AWS_S3_BUCKET,
+        cloudfrontDomain: process.env.AWS_CLOUDFRONT_DOMAIN || 'https://d196xvoij956a9.cloudfront.net'
+    },
     isProduction: process.env.NODE_ENV === 'production',
     isDevelopment: process.env.NODE_ENV === 'development'
 };

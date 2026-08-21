@@ -29,6 +29,7 @@ const harbourRoutes = require('./routes/harbourroutes');
 const notificationRoutes = require('./routes/notificationroutes');
 const subscriptionPlanRoutes = require('./routes/subscriptionPlanRoutes');
 const subscriptionRoutes = require('./routes/subscriptionRoutes');
+const documentRoutes = require('./routes/documentroutes');
 
 
 // Helper to wrap async handlers for Express 5
@@ -79,6 +80,7 @@ app.use('/api/harbours', harbourRoutes);
 app.use('/api/notifications', notificationRoutes);
 app.use('/api/subscription-plans', subscriptionPlanRoutes);
 app.use('/api/subscription', subscriptionRoutes);
+app.use('/api/documents', documentRoutes);
 
 // Audit logging for all API routes
 app.use('/api', auditLog);
