@@ -101,3 +101,14 @@ exports.rejectRenewal = async (req, res) => {
         return errorResponse(res, 400, error.message);
     }
 };
+
+// ─── GET /api/subscription/billing-history ───────────────────────────
+exports.getBillingHistory = async (req, res) => {
+    try {
+        const history = await subscriptionService.getBillingHistory(req.user._id);
+        return successResponse(res, 200, 'Billing history fetched successfully', history);
+    } catch (error) {
+        logger.error('getBillingHistory error:', error);
+        return errorResponse(res, 500, error.message);
+    }
+};

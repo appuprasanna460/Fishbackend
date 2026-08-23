@@ -120,7 +120,13 @@ const registerSchema = Joi.object({
     // Legacy enum plan field — kept optional for backward compatibility with old clients
     subscriptionPlan: Joi.string().valid('QUARTERLY', 'HALF_YEARLY', 'YEARLY').optional().messages({
         'any.only': 'Subscription plan must be QUARTERLY, HALF_YEARLY, or YEARLY'
-    })
+    }),
+    aboutYou: Joi.string().trim().allow('').optional(),
+    dateOfBirth: Joi.date().allow(null).optional(),
+    address: Joi.string().trim().allow('').optional(),
+    emergencyContactName: Joi.string().trim().allow('').optional(),
+    emergencyContactRelationship: Joi.string().trim().allow('').optional(),
+    emergencyContactPhone: Joi.string().trim().allow('').optional()
 });
 
 module.exports = {

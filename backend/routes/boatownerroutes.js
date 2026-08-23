@@ -248,6 +248,13 @@ router.delete('/fishing-locations/:id',
 // ─── Profile ──────────────────────────────────────────────────────────────────
 router.get('/profile', boatOwnerController.getProfile);
 
+// ─── Team / Company Users ────────────────────────────────────────────────────
+router.get('/team', boatOwnerController.getTeamMembers);
+router.post('/team', boatOwnerController.createTeamMember);
+router.put('/team/:id', validate(idParamSchema, 'params'), boatOwnerController.updateTeamMember);
+router.delete('/team/:id', validate(idParamSchema, 'params'), boatOwnerController.deleteTeamMember);
+router.patch('/team/:id/toggle-status', validate(idParamSchema, 'params'), boatOwnerController.toggleTeamMemberStatus);
+
 // ─── Crew Routes ──────────────────────────────────────────────────────────────
 router.post('/crew', validate(createCrewSchema), crewController.createCrew);
 router.get('/crew', crewController.getCrew);

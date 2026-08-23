@@ -1,4 +1,5 @@
 const boatOwnerService = require('../services/boatOwnerService');
+const User = require('../models/usermodel');
 const { successResponse, paginatedResponse, errorResponse } = require('../utils/responseutils');
 const { getPaginationParams, buildPaginationMeta } = require('../utils/paginationutils');
 const logger = require('../config/logger');
@@ -165,6 +166,154 @@ const getProfile = async (req, res) => {
     }
 };
 
+/**
+ * Get all team members for a boat owner
+ */
+const getTeamMembers = async (req, res) => {
+    try {
+        const ownerId = req.user._id;
+        const members = await User.find({ ownerId, isDeleted: false })
+            .populate('assignedBoatId', 'name registrationNumber')
+            .sort({ createdAt: -1 })
+            .lean();
+        successResponse(res, 200, 'Team members retrieved successfully', members);
+    } catch (error) {
+        logger.error('Get team members error:', error);
+        errorResponse(res, 500, error.message || 'Failed to get team members');
+    }
+};
+
+/**
+ * Create a team member (company user) under boat owner
+ */
+const createTeamMember = async (req, res) => {
+    try {
+        const ownerId = req.user._id;
+        const { 
+            name, email, password, phone, role, assignedBoatId, employeeId, joinedDate, 
+            dob, address, emergencyContactName, emergencyContactRelationship, emergencyContactPhone 
+        } = req.body;
+
+        const existing = await User.findByEmail(email);
+        if (existing) {
+            return errorResponse(res, 400, 'A user with this email already exists');
+        }
+
+        const member = new User({
+            name,
+            email: email.toLowerCase().trim(),
+            password: password || 'Password123!',
+            phone,
+            role, // CAPTAIN, CREW, MECHANIC, ACCOUNTANT
+            ownerId,
+            assignedBoatId: assignedBoatId || null,
+            employeeId: employeeId || `EMP-${Date.now().toString().slice(-4)}`,
+            joinedDate: joinedDate || new Date(),
+            dateOfBirth: dob || null,
+            address: address || '',
+            emergencyContactName: emergencyContactName || '',
+            emergencyContactRelationship: emergencyContactRelationship || '',
+            emergencyContactPhone: emergencyContactPhone || '',
+            isActive: true,
+            isApproved: true,
+        });
+
+        await member.save();
+        successResponse(res, 201, 'Team member created successfully', member);
+    } catch (error) {
+        logger.error('Create team member error:', error);
+        errorResponse(res, 400, error.message || 'Failed to create team member');
+    }
+};
+
+/**
+ * Update team member details
+ */
+const updateTeamMember = async (req, res) => {
+    try {
+        const ownerId = req.user._id;
+        const memberId = req.params.id;
+        const updateData = { ...req.body };
+
+        // Verify ownership
+        const member = await User.findOne({ _id: memberId, ownerId, isDeleted: false });
+        if (!member) {
+            return errorResponse(res, 404, 'Team member not found');
+        }
+
+        if (updateData.email) {
+            const existing = await User.findOne({
+                email: updateData.email.toLowerCase().trim(),
+                _id: { $ne: memberId },
+                isDeleted: false
+            });
+            if (existing) return errorResponse(res, 400, 'Email already in use');
+        }
+
+        // Prevent updating sensitive fields
+        delete updateData.password;
+        delete updateData.ownerId;
+        delete updateData.isApproved;
+
+        const updated = await User.findByIdAndUpdate(
+            memberId,
+            { $set: updateData },
+            { new: true, runValidators: true }
+        );
+
+        successResponse(res, 200, 'Team member updated successfully', updated);
+    } catch (error) {
+        logger.error('Update team member error:', error);
+        errorResponse(res, 400, error.message || 'Failed to update team member');
+    }
+};
+
+/**
+ * Toggle team member active/inactive status
+ */
+const toggleTeamMemberStatus = async (req, res) => {
+    try {
+        const ownerId = req.user._id;
+        const memberId = req.params.id;
+
+        const member = await User.findOne({ _id: memberId, ownerId, isDeleted: false });
+        if (!member) {
+            return errorResponse(res, 404, 'Team member not found');
+        }
+
+        member.isActive = !member.isActive;
+        await member.save();
+
+        successResponse(res, 200, `Team member ${member.isActive ? 'activated' : 'deactivated'} successfully`, member);
+    } catch (error) {
+        logger.error('Toggle status error:', error);
+        errorResponse(res, 400, error.message || 'Failed to toggle status');
+    }
+};
+
+/**
+ * Delete team member (soft delete)
+ */
+const deleteTeamMember = async (req, res) => {
+    try {
+        const ownerId = req.user._id;
+        const memberId = req.params.id;
+
+        const member = await User.findOne({ _id: memberId, ownerId, isDeleted: false });
+        if (!member) {
+            return errorResponse(res, 404, 'Team member not found');
+        }
+
+        member.isDeleted = true;
+        await member.save();
+
+        successResponse(res, 200, 'Team member removed successfully');
+    } catch (error) {
+        logger.error('Delete team member error:', error);
+        errorResponse(res, 400, error.message || 'Failed to delete team member');
+    }
+};
+
 // ─── Exports ─────────────────────────────────────────────────
 
 module.exports = {
@@ -180,4 +329,9 @@ module.exports = {
     getFishingLocations,
     deleteFishingLocation,
     getProfile,
+    getTeamMembers,
+    createTeamMember,
+    updateTeamMember,
+    deleteTeamMember,
+    toggleTeamMemberStatus
 };

@@ -30,7 +30,7 @@ const userSchema = new mongoose.Schema({
     },
     role: {
         type: String,
-        enum: ['SUPER_ADMIN', 'COMMISSION_AGENT', 'STAFF', 'FISH_BUYER', 'BOAT_OWNER'],
+        enum: ['SUPER_ADMIN', 'COMMISSION_AGENT', 'STAFF', 'FISH_BUYER', 'BOAT_OWNER', 'CAPTAIN', 'CREW', 'MECHANIC', 'ACCOUNTANT'],
         required: true,
         default: 'FISH_BUYER'
     },
@@ -100,6 +100,111 @@ const userSchema = new mongoose.Schema({
     agentId: {
         type: mongoose.Schema.Types.ObjectId,
         ref: 'User'
+    },
+    // User Profile fields
+    aboutYou: {
+        type: String,
+        trim: true,
+        default: ''
+    },
+    dateOfBirth: {
+        type: Date,
+        default: null
+    },
+    address: {
+        type: String,
+        trim: true,
+        default: ''
+    },
+    emergencyContactName: {
+        type: String,
+        trim: true,
+        default: ''
+    },
+    emergencyContactRelationship: {
+        type: String,
+        trim: true,
+        default: ''
+    },
+    emergencyContactPhone: {
+        type: String,
+        trim: true,
+        default: ''
+    },
+    // Company profile fields
+    companyLogo: {
+        type: String,
+        trim: true,
+        default: ''
+    },
+    companyId: {
+        type: String,
+        trim: true,
+        default: ''
+    },
+    companyEstablishedDate: {
+        type: String,
+        trim: true,
+        default: ''
+    },
+    companyType: {
+        type: String,
+        trim: true,
+        default: ''
+    },
+    companyRegisteredHarbour: {
+        type: String,
+        trim: true,
+        default: ''
+    },
+    companyRegisteredAddress: {
+        type: String,
+        trim: true,
+        default: ''
+    },
+    companyGstNumber: {
+        type: String,
+        trim: true,
+        default: ''
+    },
+    companyPanNumber: {
+        type: String,
+        trim: true,
+        default: ''
+    },
+    companyPhone: {
+        type: String,
+        trim: true,
+        default: ''
+    },
+    companyEmail: {
+        type: String,
+        trim: true,
+        default: ''
+    },
+    companyIsVerified: {
+        type: Boolean,
+        default: false
+    },
+    // Team member/Company user fields
+    ownerId: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'User',
+        default: null
+    },
+    assignedBoatId: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'Boat',
+        default: null
+    },
+    employeeId: {
+        type: String,
+        trim: true,
+        default: ''
+    },
+    joinedDate: {
+        type: Date,
+        default: null
     },
     isActive: {
         type: Boolean,

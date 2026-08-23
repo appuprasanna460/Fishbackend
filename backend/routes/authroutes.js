@@ -20,5 +20,6 @@ router.post('/register', validate(registerSchema), authController.register);
 router.post('/logout', authenticate, authController.logout);
 router.post('/change-password', authenticate, validate(changePasswordSchema), authController.changePassword);
 router.get('/profile', authenticate, authController.getProfile);
+router.put('/profile', authenticate, authController.updateProfile);
 
 module.exports = router;

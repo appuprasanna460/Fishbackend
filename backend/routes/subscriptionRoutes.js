@@ -21,6 +21,9 @@ router.get('/renewal/status', subscriptionController.getMyRenewalStatus);
 // POST create a renewal request
 router.post('/renewal', subscriptionController.createRenewalRequest);
 
+// GET my billing/payment history
+router.get('/billing-history', subscriptionController.getBillingHistory);
+
 // ── Super Admin only ──────────────────────────────────────────────────────────
 const adminOnly = authorize(['SUPER_ADMIN']);
 

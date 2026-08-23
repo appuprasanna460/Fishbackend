@@ -242,6 +242,16 @@ class SubscriptionService {
         logger.info(`Renewal rejected: requestId=${requestId} by userId=${rejectedById}`);
         return request;
     }
+
+    /**
+     * Get billing/payment history (approved renewal requests)
+     */
+    async getBillingHistory(userId) {
+        return RenewalRequest.find({ userId, status: 'APPROVED' })
+            .populate('requestedPlanId')
+            .sort({ approvedAt: -1 })
+            .lean();
+    }
 }
 
 module.exports = new SubscriptionService();

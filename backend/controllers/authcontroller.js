@@ -23,13 +23,20 @@ const login = async (req, res, next) => {
  */
 const register = async (req, res) => {
     try {
-        const { name, email, password, phone, companyName, referenceBy, role, harbourId, subscriptionPlanId, subscriptionPlan } = req.body;
+        const { 
+            name, email, password, phone, companyName, referenceBy, role, harbourId, 
+            subscriptionPlanId, subscriptionPlan,
+            aboutYou, dateOfBirth, address, 
+            emergencyContactName, emergencyContactRelationship, emergencyContactPhone 
+        } = req.body;
 
         // Check if email already exists
         const existing = await User.findByEmail(email);
         if (existing) {
             return errorResponse(res, 400, 'An account with this email already exists');
         }
+
+        const isBoatOwner = role === 'BOAT_OWNER';
 
         // Create user with isApproved=false, isActive=false
         const user = new User({
@@ -46,7 +53,22 @@ const register = async (req, res) => {
             subscriptionPlan: subscriptionPlan || 'NONE',
             subscriptionStatus: 'PENDING_APPROVAL',
             isApproved: false,
-            isActive: false
+            isActive: false,
+            // Profile fields
+            aboutYou: aboutYou || '',
+            dateOfBirth: dateOfBirth || null,
+            address: address || '',
+            emergencyContactName: emergencyContactName || '',
+            emergencyContactRelationship: emergencyContactRelationship || '',
+            emergencyContactPhone: emergencyContactPhone || '',
+            // Initialize default company values if BOAT_OWNER
+            companyId: isBoatOwner ? `RF-${new Date().getFullYear()}-${Math.floor(100 + Math.random() * 900)}` : '',
+            companyEstablishedDate: isBoatOwner ? `Since ${new Date().getFullYear()}` : '',
+            companyType: isBoatOwner ? 'Sole Proprietorship' : '',
+            companyPhone: isBoatOwner ? phone : '',
+            companyEmail: isBoatOwner ? email.trim().toLowerCase() : '',
+            companyRegisteredAddress: isBoatOwner ? (address || '') : '',
+            companyIsVerified: false
         });
         await user.save();
 
@@ -125,11 +147,50 @@ const getProfile = async (req, res, next) => {
     }
 };
 
+/**
+ * Update current user profile
+ */
+const updateProfile = async (req, res, next) => {
+    try {
+        const userId = req.user._id;
+        const updateData = { ...req.body };
+
+        // Prevent updating sensitive system properties directly from profile
+        delete updateData.password;
+        delete updateData.role;
+        delete updateData.isApproved;
+        delete updateData.isActive;
+        delete updateData.isDeleted;
+        delete updateData.subscriptionPlan;
+        delete updateData.subscriptionPlanId;
+        delete updateData.subscriptionPlanName;
+        delete updateData.subscriptionStatus;
+        delete updateData.subscriptionStartDate;
+        delete updateData.subscriptionEndDate;
+
+        const user = await User.findByIdAndUpdate(
+            userId,
+            { $set: updateData },
+            { new: true, runValidators: true }
+        ).select('-password');
+
+        if (!user) {
+            return errorResponse(res, 404, 'User not found');
+        }
+
+        successResponse(res, 200, 'Profile updated successfully', user);
+    } catch (error) {
+        logger.error('Update profile error:', error);
+        errorResponse(res, 400, error.message || 'Failed to update profile');
+    }
+};
+
 module.exports = {
     login,
     register,
     refresh,
     logout,
     changePassword,
-    getProfile
+    getProfile,
+    updateProfile
 };
