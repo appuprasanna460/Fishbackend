@@ -197,6 +197,16 @@ const getCommissionAgents = async (req, res, next) => {
     }
 };
 
+const getUserStats = async (req, res, next) => {
+    try {
+        const stats = await userService.getUserStats();
+        successResponse(res, 200, 'User stats retrieved successfully', stats);
+    } catch (error) {
+        logger.error('Get user stats error:', error);
+        errorResponse(res, 500, error.message || 'Failed to get user stats');
+    }
+};
+
 module.exports = {
     createUser,
     getUsers,
@@ -209,5 +219,6 @@ module.exports = {
     createMyStaff,
     updateMyStaff,
     deleteMyStaff,
-    getCommissionAgents
+    getCommissionAgents,
+    getUserStats
 };

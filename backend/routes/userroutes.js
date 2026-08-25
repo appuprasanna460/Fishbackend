@@ -23,6 +23,11 @@ router.get('/commission-agents',
     userController.getCommissionAgents
 );
 
+router.get('/stats',
+    authorize('SUPER_ADMIN'),
+    userController.getUserStats
+);
+
 // Super admin only routes
 router.get('/',
     authorize('SUPER_ADMIN'),
