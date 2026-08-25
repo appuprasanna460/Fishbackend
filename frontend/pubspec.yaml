@@ -1,0 +1,101 @@
+name: HarbourPro
+description: "Fish Market Management System - Premium Flutter Application"
+publish_to: 'none'
+
+version: 1.0.0+1
+
+environment:
+  sdk: ^3.8.1
+
+dependencies:
+  flutter:
+    sdk: flutter
+
+  cupertino_icons: ^1.0.8
+
+  # State Management
+  flutter_riverpod: ^2.6.1
+  riverpod_annotation: ^2.6.1
+
+  # Navigation
+  go_router: ^17.0.0
+
+  # Networking
+  dio: ^5.9.2
+  connectivity_plus: ^6.1.4
+
+  # Storage
+  flutter_secure_storage: ^10.3.1
+  shared_preferences: ^2.5.3
+  hive_flutter: ^1.1.0
+
+  # Serialization
+  intl: ^0.20.2
+  json_annotation: ^4.9.0
+  freezed_annotation: ^3.0.0
+
+  # UI / Charts
+  fl_chart: ^0.70.2
+  shimmer: ^3.0.0
+  cached_network_image: ^3.4.1
+  lottie: ^3.3.1
+
+  # Maps
+  flutter_map: ^8.1.1
+  latlong2: ^0.9.1
+
+  # Forms
+  dropdown_search: ^6.0.1
+
+  # ✅ PDF Generation
+  pdf: ^3.11.1
+  printing: ^5.14.1
+
+  # ✅ PDF Download - Added these packages
+  share_plus: ^7.2.1
+  path_provider: ^2.1.0
+
+  # Fonts
+  google_fonts: ^6.2.1
+
+  # Functional Programming
+  dartz: ^0.10.1
+  geolocator: ^14.0.2
+  image_picker: ^1.2.3
+  file_picker: ^8.1.7
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+
+  flutter_lints: ^5.0.0
+  build_runner: ^2.5.4
+  freezed: ^3.0.0
+  json_serializable: ^6.9.0
+  riverpod_generator: ^2.6.5
+  flutter_launcher_icons: ^0.14.3
+
+flutter_launcher_icons:
+  android: true
+  ios: true
+  image_path: "assets/logo.png"
+  remove_alpha_ios: true
+  adaptive_icon_background: "#FFFFFF"
+  adaptive_icon_foreground: "assets/logo.png"
+  web:
+    generate: true
+    image_path: "assets/logo.png"
+  windows:
+    generate: true
+    image_path: "assets/logo.png"
+  macos:
+    generate: true
+    image_path: "assets/logo.png"
+
+flutter:
+  uses-material-design: true
+
+  assets:
+    - assets/logo.png
+    - assets/image.png
+    - assets/dashboard.png
