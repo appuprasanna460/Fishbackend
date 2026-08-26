@@ -461,91 +461,30 @@ class UserService {
     }
 
     async getUserStats() {
-        const now = new Date();
-        const thirtyDaysAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
-        const sixtyDaysAgo = new Date(now.getTime() - 60 * 24 * 60 * 60 * 1000);
-
-        // Get current counts
-        const totalUsers = await User.countDocuments({ isDeleted: false });
-        const activeUsers = await User.countDocuments({ isDeleted: false, isActive: true });
+        const [totalUsers, activeUsers] = await Promise.all([
+            User.countDocuments({ isDeleted: false }),
+            User.countDocuments({ isDeleted: false, isActive: true })
+        ]);
         const inactiveUsers = totalUsers - activeUsers;
-
-        // Get counts for users registered in [30 days ago, now] vs [60 days ago, 30 days ago]
-        const totalRecent = await User.countDocuments({ isDeleted: false, createdAt: { $gte: thirtyDaysAgo } });
-        const totalPrior = await User.countDocuments({ isDeleted: false, createdAt: { $gte: sixtyDaysAgo, $lt: thirtyDaysAgo } });
-
-        const activeRecent = await User.countDocuments({ isDeleted: false, isActive: true, createdAt: { $gte: thirtyDaysAgo } });
-        const activePrior = await User.countDocuments({ isDeleted: false, isActive: true, createdAt: { $gte: sixtyDaysAgo, $lt: thirtyDaysAgo } });
-
-        const inactiveRecent = await User.countDocuments({ isDeleted: false, isActive: false, createdAt: { $gte: thirtyDaysAgo } });
-        const inactivePrior = await User.countDocuments({ isDeleted: false, isActive: false, createdAt: { $gte: sixtyDaysAgo, $lt: thirtyDaysAgo } });
-
-        // Calculate trend percentages
-        const totalTrend = totalPrior > 0 ? ((totalRecent - totalPrior) / totalPrior) * 100 : (totalRecent > 0 ? 100 : 0);
-        const activeTrend = activePrior > 0 ? ((activeRecent - activePrior) / activePrior) * 100 : (activeRecent > 0 ? 100 : 0);
-        const inactiveTrend = inactivePrior > 0 ? ((inactiveRecent - inactivePrior) / inactivePrior) * 100 : (inactiveRecent > 0 ? 100 : 0);
-
-        // Sparkline data for the last 9 days
-        const sparklineDataTotal = [];
-        const sparklineDataActive = [];
-        const sparklineDataInactive = [];
-
-        // Base counts from 9 days ago
-        let runningTotal = await User.countDocuments({ isDeleted: false, createdAt: { $lt: new Date(now.getFullYear(), now.getMonth(), now.getDate() - 8) } });
-        let runningActive = await User.countDocuments({ isDeleted: false, isActive: true, createdAt: { $lt: new Date(now.getFullYear(), now.getMonth(), now.getDate() - 8) } });
-        let runningInactive = await User.countDocuments({ isDeleted: false, isActive: false, createdAt: { $lt: new Date(now.getFullYear(), now.getMonth(), now.getDate() - 8) } });
-
-        for (let i = 8; i >= 0; i--) {
-            const startOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate() - i);
-            const endOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate() - i + 1);
-
-            const dayTotal = await User.countDocuments({
-                isDeleted: false,
-                createdAt: { $gte: startOfDay, $lt: endOfDay }
-            });
-            const dayActive = await User.countDocuments({
-                isDeleted: false,
-                isActive: true,
-                createdAt: { $gte: startOfDay, $lt: endOfDay }
-            });
-            const dayInactive = await User.countDocuments({
-                isDeleted: false,
-                isActive: false,
-                createdAt: { $gte: startOfDay, $lt: endOfDay }
-            });
-
-            runningTotal += dayTotal;
-            runningActive += dayActive;
-            runningInactive += dayInactive;
-
-            sparklineDataTotal.push(runningTotal);
-            sparklineDataActive.push(runningActive);
-            sparklineDataInactive.push(runningInactive);
-        }
-
-        // Fallbacks in case everything is 0 (to make sparkline look nice in fresh dev databases)
-        const finalTotalSparkline = sparklineDataTotal.every(v => v === 0) ? [15.0, 25.0, 20.0, 35.0, 45.0, 40.0, 60.0, 55.0, 75.0] : sparklineDataTotal.map(v => parseFloat(v));
-        const finalActiveSparkline = sparklineDataActive.every(v => v === 0) ? [20.0, 30.0, 40.0, 35.0, 50.0, 60.0, 65.0, 70.0, 85.0] : sparklineDataActive.map(v => parseFloat(v));
-        const finalInactiveSparkline = sparklineDataInactive.every(v => v === 0) ? [65.0, 55.0, 50.0, 40.0, 45.0, 35.0, 30.0, 25.0, 18.0] : sparklineDataInactive.map(v => parseFloat(v));
 
         return {
             total: {
                 value: totalUsers,
-                trendPercentage: parseFloat(totalTrend.toFixed(1)),
-                isPositive: totalTrend >= 0,
-                sparklineData: finalTotalSparkline
+                trendPercentage: 0,
+                isPositive: true,
+                sparklineData: []
             },
             active: {
                 value: activeUsers,
-                trendPercentage: parseFloat(activeTrend.toFixed(1)),
-                isPositive: activeTrend >= 0,
-                sparklineData: finalActiveSparkline
+                trendPercentage: 0,
+                isPositive: true,
+                sparklineData: []
             },
             inactive: {
                 value: inactiveUsers,
-                trendPercentage: parseFloat(inactiveTrend.toFixed(1)),
-                isPositive: inactiveTrend >= 0,
-                sparklineData: finalInactiveSparkline
+                trendPercentage: 0,
+                isPositive: true,
+                sparklineData: []
             }
         };
     }

@@ -84,7 +84,7 @@ class VoyageService {
             .populate('boatId', 'boatName boatNumber registrationNumber capacity')
             .populate('captainId', 'name phone location')
             .populate('crewMembers', 'name phone role')
-            .populate('departureHarbour', 'harbourName')
+            .populate('departureHarbour', 'name')
             .populate('targetSpecies', 'name pricePerKg')
             .sort({ departureDate: -1 })
             .lean();
@@ -96,7 +96,7 @@ class VoyageService {
             .populate('boatId', 'boatName boatNumber registrationNumber capacity')
             .populate('captainId', 'name phone location experience notes')
             .populate('crewMembers', 'name phone role location age experience notes')
-            .populate('departureHarbour', 'harbourName code')
+            .populate('departureHarbour', 'name')
             .populate('targetSpecies', 'name localName category pricePerKg');
 
         if (!voyage) {
