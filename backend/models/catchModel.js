@@ -4,7 +4,7 @@ const catchSchema = new mongoose.Schema({
     haulId: {
         type: mongoose.Schema.Types.ObjectId,
         ref: 'Haul',
-        required: true
+        required: false
     },
     voyageId: {
         type: mongoose.Schema.Types.ObjectId,
@@ -36,6 +36,14 @@ const catchSchema = new mongoose.Schema({
         default: 0,
         min: 0,
         max: 100
+    },
+    rate: {
+        type: Number,
+        default: 0
+    },
+    amount: {
+        type: Number,
+        default: 0
     }
 }, {
     timestamps: true
@@ -45,6 +53,7 @@ const catchSchema = new mongoose.Schema({
 catchSchema.index({ haulId: 1 });
 catchSchema.index({ voyageId: 1 });
 catchSchema.index({ ownerId: 1 });
+catchSchema.index({ voyageId: 1, species: 1 });
 
 const Catch = mongoose.model('Catch', catchSchema);
 module.exports = Catch;

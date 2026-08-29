@@ -84,11 +84,25 @@ const getBillSummaryByBoat = async (req, res, next) => {
     }
 };
 
+/**
+ * Cancel bill
+ */
+const cancelBill = async (req, res, next) => {
+    try {
+        const bill = await billService.cancelBill(req.params.id, req.user);
+        successResponse(res, 200, 'Bill cancelled successfully', bill);
+    } catch (error) {
+        logger.error('Cancel bill error:', error);
+        errorResponse(res, 400, error.message || 'Failed to cancel bill');
+    }
+};
+
 module.exports = {
     createBill,
     getBills,
     getBillById,
     updateBill,
     deleteBill,
-    getBillSummaryByBoat
+    getBillSummaryByBoat,
+    cancelBill
 };

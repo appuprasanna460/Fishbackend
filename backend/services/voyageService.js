@@ -293,6 +293,45 @@ class VoyageService {
             todaySales
         };
     }
+
+    // Get active voyages for agent
+    async getActiveVoyagesForAgent(agentId) {
+        const boats = await Boat.find({ agentId, isDeleted: false }).select('_id').lean();
+        const boatIds = boats.map(b => b._id);
+
+        const voyages = await Voyage.find({
+            boatId: { $in: boatIds },
+            status: { $in: ['ACTIVE', 'PLANNED'] },
+            isDeleted: false
+        })
+        .populate('boatId', 'boatName boatNumber registrationNumber capacity')
+        .populate('captainId', 'name phone')
+        .sort({ departureDate: -1 })
+        .lean();
+
+        return voyages.map(voyage => ({
+            id: voyage._id,
+            voyageNo: voyage._id.toString().substring(18).toUpperCase(),
+            boatId: voyage.boatId?._id,
+            boatName: voyage.boatId?.boatName || '',
+            boatNumber: voyage.boatId?.boatNumber || '',
+            status: voyage.status,
+            departureDate: voyage.departureDate,
+            captainName: voyage.captainId?.name || '',
+            crewCount: voyage.crewMembers ? voyage.crewMembers.length : 0
+        }));
+    }
+
+    /**
+     * Get voyages by generic filter query
+     */
+    async getVoyagesByFilter(filter) {
+        return Voyage.find(filter)
+            .populate('boatId', 'boatName boatNumber registrationNumber capacity')
+            .populate('captainId', 'name phone')
+            .sort({ departureDate: -1 })
+            .lean();
+    }
 }
 
 module.exports = new VoyageService();

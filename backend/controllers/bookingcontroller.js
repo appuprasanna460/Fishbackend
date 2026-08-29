@@ -22,7 +22,8 @@ const createBooking = async (req, res, next) => {
  */
 const getAgentBookings = async (req, res, next) => {
     try {
-        const bookings = await bookingService.getAgentBookings(req.user._id);
+        const agentId = req.query.agentId || (req.user.role === 'STAFF' && req.user.agentId ? req.user.agentId : req.user._id);
+        const bookings = await bookingService.getAgentBookings(agentId);
         successResponse(res, 200, 'Bookings retrieved successfully', bookings);
     } catch (error) {
         logger.error('Get agent bookings error:', error);
@@ -114,6 +115,52 @@ const getAgentBookedBoats = async (req, res, next) => {
     }
 };
 
+const updateBookingStatus = async (req, res, next) => {
+    try {
+        const { status } = req.body;
+        const bookingId = req.params.id;
+        const approvedBy = req.user._id;
+
+        const booking = await bookingService.updateBookingStatus(bookingId, status, approvedBy);
+        successResponse(res, 200, 'Booking status updated successfully', {
+            id: booking._id,
+            status: booking.status,
+            approvedAt: booking.approvedAt
+        });
+    } catch (error) {
+        logger.error('Update booking status error:', error);
+        errorResponse(res, 400, error.message || 'Failed to update booking status');
+    }
+};
+
+const getActiveBookedBoats = async (req, res, next) => {
+    try {
+        const agentId = req.query.agentId || (req.user.role === 'COMMISSION_AGENT' ? req.user._id : null);
+        if (!agentId) {
+            return errorResponse(res, 400, 'agentId is required');
+        }
+        const bookings = await bookingService.getActiveBookingsWithDetails(agentId);
+        successResponse(res, 200, 'Active bookings retrieved successfully', bookings);
+    } catch (error) {
+        logger.error('Get active bookings error:', error);
+        errorResponse(res, 500, error.message || 'Failed to retrieve active bookings');
+    }
+};
+
+/**
+ * Get bookings for the logged-in boat owner's boats
+ */
+const getOwnerBookings = async (req, res, next) => {
+    try {
+        const ownerId = req.user._id;
+        const bookings = await bookingService.getBookingsForOwner(ownerId);
+        successResponse(res, 200, 'Owner bookings retrieved successfully', bookings);
+    } catch (error) {
+        logger.error('Get owner bookings error:', error);
+        errorResponse(res, 500, error.message || 'Failed to get owner bookings');
+    }
+};
+
 module.exports = {
     createBooking,
     getAgentBookings,
@@ -122,5 +169,8 @@ module.exports = {
     getAllBookings,
     getAllBookingsForDisplay,
     checkBoatBooking,
-    getAgentBookedBoats  // ✅ NEW
+    getAgentBookedBoats,
+    updateBookingStatus,
+    getActiveBookedBoats,
+    getOwnerBookings
 };

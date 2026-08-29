@@ -18,6 +18,7 @@ router.use(authenticate);
 
 // Get boats (filtered by role)
 router.get('/',
+    authorize('SUPER_ADMIN', 'COMMISSION_AGENT', 'BOAT_OWNER', 'FISH_BUYER', 'CAPTAIN', 'CREW', 'MECHANIC', 'ACCOUNTANT'),
     validate(boatListQuerySchema, 'query'),
     boatController.getBoats
 );

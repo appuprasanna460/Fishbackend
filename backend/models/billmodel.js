@@ -42,6 +42,37 @@ const billSchema = new mongoose.Schema({
         type: mongoose.Schema.Types.ObjectId,
         ref: 'User'
     },
+    createdBy: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'User',
+        required: true
+    },
+    createdByRole: {
+        type: String,
+        enum: ['COMMISSION_AGENT', 'STAFF'],
+        required: true
+    },
+    buyerDetails: {
+        name: { type: String, trim: true },
+        contact: { type: String, trim: true },
+        lotNumber: { type: String, trim: true }
+    },
+    voyageId: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'Voyage'
+    },
+    commissionPercent: {
+        type: Number,
+        default: 2.0
+    },
+    commissionAmount: {
+        type: Number,
+        default: 0
+    },
+    netAmount: {
+        type: Number,
+        default: 0
+    },
     buyerId: {
         type: mongoose.Schema.Types.ObjectId,
         ref: 'User'
@@ -62,17 +93,13 @@ const billSchema = new mongoose.Schema({
         type: Number,
         default: 0
     },
-    commissionAmount: {
-        type: Number,
-        default: 0
-    },
     grandTotal: {
         type: Number
     },
     status: {
         type: String,
-        enum: ['CONFIRMED', 'CANCELLED'],
-        default: 'CONFIRMED'
+        enum: ['SAVED', 'CONFIRMED', 'CANCELLED'],
+        default: 'SAVED'
     },
     paymentMethod: {
         type: String,
@@ -103,6 +130,10 @@ billSchema.index({ status: 1 });
 billSchema.index({ billDate: 1 });
 billSchema.index({ locationId: 1 });
 billSchema.index({ 'fishEntries.fishId': 1 });
+billSchema.index({ agentId: 1, createdBy: 1 });
+billSchema.index({ agentId: 1, createdByRole: 1 });
+billSchema.index({ staffId: 1 });
+billSchema.index({ voyageId: 1 });
 
 const Bill = mongoose.model('Bill', billSchema);
 module.exports = Bill;

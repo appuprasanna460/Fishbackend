@@ -2,52 +2,72 @@ const Catch = require('../models/catchModel');
 const Haul = require('../models/haulModel');
 const haulService = require('./haulService');
 const fishingGroundService = require('./fishingGroundService');
+const VoyageIncome = require('../models/voyageIncomeModel');
 
 class CatchService {
-    // Create a new catch for a haul
-    async createCatch(data, ownerId) {
-        const { haulId, species, weight, boxes, sharePercentage } = data;
+    // Create a new catch
+    async createCatch(data, userId) {
+        const { haulId, voyageId, species, weight, boxes, rate, sharePercentage } = data;
 
-        // Verify the haul exists and belongs to the owner
-        const haul = await Haul.findOne({ _id: haulId, ownerId });
-        if (!haul) {
-            throw new Error('Haul not found or access denied');
-        }
-
-        // Allow adding catch to STOPPED hauls (not yet completed) or COMPLETED hauls
-        if (haul.status === 'ACTIVE') {
-            throw new Error('Cannot add catch to an active haul. Stop the haul first.');
-        }
-
-        const newCatch = new Catch({
-            haulId,
-            voyageId: haul.voyageId,
-            ownerId,
-            species,
-            weight,
-            boxes,
-            sharePercentage
-        });
-
-        await newCatch.save();
-
-        // If the haul is STOPPED, mark it as COMPLETED now that a catch has been added
-        if (haul.status === 'STOPPED') {
-            try {
-                await haulService.completeHaul(haulId, ownerId);
-            } catch (error) {
-                console.error('Failed to complete haul after adding catch:', error);
+        if (haulId) {
+            // Verify the haul exists
+            const haul = await Haul.findOne({ _id: haulId });
+            if (!haul) {
+                throw new Error('Haul not found');
             }
-        }
 
-        // Update fishing ground total catch
-        try {
-            await fishingGroundService.updateTotalCatch(ownerId, haul.fishingGround, weight);
-        } catch (error) {
-            console.error('Failed to update fishing ground total catch:', error);
-        }
+            const newCatch = new Catch({
+                haulId,
+                voyageId: haul.voyageId,
+                ownerId: haul.ownerId,
+                species,
+                weight,
+                boxes,
+                sharePercentage,
+                rate: rate || 0,
+                amount: (weight || 0) * (rate || 0)
+            });
 
-        return newCatch;
+            await newCatch.save();
+
+            // If the haul is STOPPED, mark it as COMPLETED now that a catch has been added
+            if (haul.status === 'STOPPED') {
+                try {
+                    await haulService.completeHaul(haulId, haul.ownerId);
+                } catch (error) {
+                    console.error('Failed to complete haul after adding catch:', error);
+                }
+            }
+
+            // Update fishing ground total catch
+            try {
+                await fishingGroundService.updateTotalCatch(haul.ownerId, haul.fishingGround, weight);
+            } catch (error) {
+                console.error('Failed to update fishing ground total catch:', error);
+            }
+
+            return newCatch;
+        } else {
+            // Voyage level catch
+            const Voyage = require('../models/voyageModel');
+            const voyage = await Voyage.findById(voyageId);
+            if (!voyage) {
+                throw new Error('Voyage not found');
+            }
+
+            const newCatch = new Catch({
+                voyageId,
+                ownerId: voyage.ownerId,
+                species,
+                weight,
+                boxes,
+                rate: rate || 0,
+                amount: (weight || 0) * (rate || 0)
+            });
+
+            await newCatch.save();
+            return newCatch;
+        }
     }
 
     // Get all catches for a haul
@@ -55,23 +75,63 @@ class CatchService {
         return await Catch.find({ haulId, ownerId }).sort({ createdAt: -1 }).lean();
     }
 
+    // Get catches by voyage
+    async getCatchesByVoyage(voyageId) {
+        const catches = await Catch.find({ voyageId }).sort({ createdAt: -1 }).lean();
+        const voyageIncomes = await VoyageIncome.find({ voyageId });
+        const incomesMap = {};
+        voyageIncomes.forEach(inc => {
+            incomesMap[inc.speciesName] = inc;
+        });
+
+        return catches.map(c => {
+            const savedInc = incomesMap[c.species];
+            if (savedInc && savedInc.rate > 0) {
+                return {
+                    ...c,
+                    rate: savedInc.rate,
+                    amount: (c.weight || 0) * savedInc.rate
+                };
+            }
+            return c;
+        });
+    }
+
+    // Update catch rate
+    async updateCatchRate(catchId, rate) {
+        const singleCatch = await Catch.findById(catchId);
+        if (!singleCatch) {
+            throw new Error('Catch not found');
+        }
+
+        singleCatch.rate = rate;
+        singleCatch.amount = (singleCatch.weight || 0) * rate;
+        await singleCatch.save();
+
+        return singleCatch;
+    }
+
     // Get a single catch by ID
     async getCatchById(id, ownerId) {
-        const singleCatch = await Catch.findOne({ _id: id, ownerId });
+        const query = { _id: id };
+        if (ownerId) query.ownerId = ownerId;
+        const singleCatch = await Catch.findOne(query);
         if (!singleCatch) {
-            throw new Error('Catch not found or access denied');
+            throw new Error('Catch not found');
         }
         return singleCatch;
     }
 
     // Update a catch
     async updateCatch(id, data, ownerId) {
-        const singleCatch = await Catch.findOne({ _id: id, ownerId });
+        const query = { _id: id };
+        if (ownerId) query.ownerId = ownerId;
+        const singleCatch = await Catch.findOne(query);
         if (!singleCatch) {
-            throw new Error('Catch not found or access denied');
+            throw new Error('Catch not found');
         }
 
-        const { species, weight, boxes, sharePercentage } = data;
+        const { species, weight, boxes, sharePercentage, rate } = data;
 
         // Calculate weight difference for fishing ground update
         const weightDiff = (weight !== undefined ? weight : singleCatch.weight) - singleCatch.weight;
@@ -80,11 +140,17 @@ class CatchService {
         if (weight !== undefined) singleCatch.weight = weight;
         if (boxes !== undefined) singleCatch.boxes = boxes;
         if (sharePercentage !== undefined) singleCatch.sharePercentage = sharePercentage;
+        if (rate !== undefined) {
+            singleCatch.rate = rate;
+            singleCatch.amount = (weight !== undefined ? weight : singleCatch.weight) * rate;
+        } else if (weight !== undefined) {
+            singleCatch.amount = weight * (singleCatch.rate || 0);
+        }
 
         await singleCatch.save();
 
-        // Update fishing ground total catch if weight changed
-        if (weightDiff !== 0) {
+        // Update fishing ground total catch if weight changed and haulId exists
+        if (weightDiff !== 0 && singleCatch.haulId) {
             try {
                 const haul = await Haul.findById(singleCatch.haulId);
                 if (haul) {
@@ -100,19 +166,23 @@ class CatchService {
 
     // Delete a catch (hard delete for catches as they are transactional data entries)
     async deleteCatch(id, ownerId) {
-        const singleCatch = await Catch.findOne({ _id: id, ownerId });
+        const query = { _id: id };
+        if (ownerId) query.ownerId = ownerId;
+        const singleCatch = await Catch.findOne(query);
         if (!singleCatch) {
-            throw new Error('Catch not found or access denied');
+            throw new Error('Catch not found');
         }
 
-        // Subtract weight from fishing ground
-        try {
-            const haul = await Haul.findById(singleCatch.haulId);
-            if (haul) {
-                await fishingGroundService.updateTotalCatch(ownerId, haul.fishingGround, -singleCatch.weight);
+        // Subtract weight from fishing ground if haulId exists
+        if (singleCatch.haulId) {
+            try {
+                const haul = await Haul.findById(singleCatch.haulId);
+                if (haul) {
+                    await fishingGroundService.updateTotalCatch(ownerId, haul.fishingGround, -singleCatch.weight);
+                }
+            } catch (error) {
+                console.error('Failed to update fishing ground total catch after delete:', error);
             }
-        } catch (error) {
-            console.error('Failed to update fishing ground total catch after delete:', error);
         }
 
         await Catch.deleteOne({ _id: id });
@@ -121,7 +191,9 @@ class CatchService {
 
     // Get catch summary for a voyage
     async getCatchSummary(voyageId, ownerId) {
-        const catches = await Catch.find({ voyageId, ownerId }).lean();
+        const query = { voyageId };
+        if (ownerId) query.ownerId = ownerId;
+        const catches = await Catch.find(query).lean();
 
         const summary = catches.reduce((acc, curr) => {
             if (!acc[curr.species]) {
@@ -141,7 +213,9 @@ class CatchService {
 
     // Full voyage catch summary: species breakdown (with share%) + per-haul breakdown
     async getCatchSummaryByVoyage(voyageId, ownerId) {
-        const catches = await Catch.find({ voyageId, ownerId }).populate('haulId', 'haulNumber').lean();
+        const query = { voyageId };
+        if (ownerId) query.ownerId = ownerId;
+        const catches = await Catch.find(query).populate('haulId', 'haulNumber').lean();
 
         const totalWeight = catches.reduce((sum, c) => sum + c.weight, 0);
 

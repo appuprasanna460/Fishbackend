@@ -5,6 +5,7 @@ const Ledger = require('../models/ledgermodel');
 const User = require('../models/usermodel');
 const Location = require('../models/locationmodel');
 const SubLocation = require('../models/subLocationmodel');
+const VoyageIncome = require('../models/voyageIncomeModel');
 const authService = require('./authservice');
 const ledgerService = require('./ledgerservice');
 const { getPaginationParams, buildPaginationMeta } = require('../utils/paginationutils');
@@ -16,44 +17,36 @@ const invoiceTemplateService = require('./invoiceTemplateService');
 
 class BillService {
     /**
-     * Generate bill number with proper date handling
+     * Generate bill number in format B-{YYYY}-{MM}-{DD}-{sequence}
      */
     async generateBillNumber() {
         const date = new Date();
         const year = date.getFullYear();
         const month = String(date.getMonth() + 1).padStart(2, '0');
         const day = String(date.getDate()).padStart(2, '0');
-        const datePrefix = `${year}${month}${day}`;
+        const prefix = `B-${year}-${month}-${day}`;
 
-        // ✅ Find the highest sequence number for today
+        // Find the highest sequence number for today
         const latestBill = await Bill.findOne({
-            billNumber: { $regex: `^INV${datePrefix}` }
-        }).sort({ billNumber: -1 }).lean();
+            billNumber: { $regex: `^B-${year}-${month}-${day}-` }
+        }).sort({ createdAt: -1 }).lean();
 
         let sequence = 1;
         if (latestBill) {
-            // Extract sequence from the latest bill number
-            const match = latestBill.billNumber.match(/^INV\d{8}(\d{4})$/);
-            if (match) {
-                sequence = parseInt(match[1]) + 1;
-            } else {
-                // Fallback: count all bills with today's prefix
-                const count = await Bill.countDocuments({
-                    billNumber: { $regex: `^INV${datePrefix}` },
-                    isDeleted: false
-                });
-                sequence = count + 1;
+            const parts = latestBill.billNumber.split('-');
+            const lastSeq = parseInt(parts[parts.length - 1]);
+            if (!isNaN(lastSeq)) {
+                sequence = lastSeq + 1;
             }
         }
 
-        // ✅ Ensure uniqueness by checking if the generated number exists
-        let billNumber = `INV${datePrefix}${String(sequence).padStart(4, '0')}`;
+        // Ensure uniqueness
+        let billNumber = `${prefix}-${sequence}`;
         let exists = await Bill.findOne({ billNumber, isDeleted: false });
 
-        // ✅ If exists, increment until we find a unique one
         while (exists) {
             sequence++;
-            billNumber = `INV${datePrefix}${String(sequence).padStart(4, '0')}`;
+            billNumber = `${prefix}-${sequence}`;
             exists = await Bill.findOne({ billNumber, isDeleted: false });
         }
 
@@ -62,17 +55,15 @@ class BillService {
     }
 
     /**
-     * Create bill with proper date handling
+     * Create bill with updated schema and calculations
      */
-    async createBill(data, userId) {
+    async createBill(data, user) {
         const {
             boatId,
-            agentId,
-            staffId,
-            buyerId,
-            locationId,
-            subLocationId,
-            fishEntries,
+            voyageId,
+            buyerDetails,
+            catchEntries,
+            commissionPercent,
             notes,
             billDate
         } = data;
@@ -80,38 +71,67 @@ class BillService {
         // Validate boat
         const boat = await Boat.findOne({ _id: boatId, isDeleted: false });
         if (!boat) {
-            throw new NotFoundError('Boat not found');
+            throw new Error('Boat not found');
         }
 
         // Generate bill number
         const billNumber = await this.generateBillNumber();
 
         // Calculate totals
-        let subtotal = 0;
-        const processedEntries = [];
+        let totalQuantity = 0;
+        let totalAmount = 0;
+        const processedCatchEntries = [];
+        const processedFishEntries = [];
 
-        if (fishEntries && Array.isArray(fishEntries)) {
-            for (const entry of fishEntries) {
-                const totalAmount = (entry.weightKg || 0) * (entry.pricePerKg || 0);
-                subtotal += totalAmount;
-                processedEntries.push({
-                    ...entry,
-                    totalAmount
+        if (catchEntries && Array.isArray(catchEntries)) {
+            for (const entry of catchEntries) {
+                const quantity = Number(entry.quantity || entry.weight || 0);
+                const rate = Number(entry.rate || 0);
+                const amount = quantity * rate;
+                totalQuantity += quantity;
+                totalAmount += amount;
+
+                processedCatchEntries.push({
+                    speciesName: entry.speciesName || entry.species || '',
+                    quantity,
+                    rate,
+                    amount
+                });
+
+                processedFishEntries.push({
+                    fishName: entry.speciesName || entry.species || '',
+                    weightKg: quantity,
+                    pricePerKg: rate,
+                    totalAmount: amount
                 });
             }
         }
 
-        // Calculate commission
-        const commissionRate = 0.05; // 5% default
-        const commissionAmount = subtotal * commissionRate;
-        const grandTotal = subtotal + commissionAmount;
+        // Commission Percentage (default 2.0%, editable 0-10%)
+        const commPercent = commissionPercent !== undefined ? Number(commissionPercent) : 2.0;
+        if (commPercent < 0 || commPercent > 10) {
+            throw new Error('Commission percentage must be between 0% and 10%');
+        }
 
-        // Handle billDate - ensure it's a Date object
+        const commissionAmount = totalAmount * (commPercent / 100);
+        const netAmount = totalAmount - commissionAmount;
+
+        // Determine agentId based on role
+        let agentId;
+        if (user.role === 'COMMISSION_AGENT') {
+            agentId = user._id;
+        } else if (user.role === 'STAFF') {
+            agentId = user.agentId;
+        } else {
+            agentId = data.agentId || user._id;
+        }
+
+        // Handle billDate
         let billDateObj = new Date();
         if (billDate) {
             billDateObj = new Date(billDate);
             if (isNaN(billDateObj.getTime())) {
-                throw new AppError('Invalid bill date format. Please use ISO format (YYYY-MM-DD)', 400);
+                throw new Error('Invalid bill date format');
             }
         }
 
@@ -119,31 +139,38 @@ class BillService {
         const bill = new Bill({
             billNumber,
             boatId,
-            agentId: agentId || userId,
-            staffId: staffId || userId,
-            buyerId,
-            locationId,
-            subLocationId,
-            fishEntries: processedEntries,
-            subtotal,
-            commissionRate,
+            voyageId,
+            agentId,
+            staffId: user.role === 'STAFF' ? user._id : undefined,
+            createdBy: user._id,
+            createdByRole: user.role === 'STAFF' ? 'STAFF' : 'COMMISSION_AGENT',
+            buyerDetails: {
+                name: buyerDetails?.name || '',
+                contact: buyerDetails?.contact || '',
+                lotNumber: buyerDetails?.lotNumber || ''
+            },
+            catchEntries: processedCatchEntries,
+            fishEntries: processedFishEntries,
+            subtotal: totalAmount,
+            grandTotal: totalAmount,
+            commissionPercent: commPercent,
             commissionAmount,
-            grandTotal,
-            status: 'CONFIRMED',
-            notes,
+            netAmount,
+            status: 'SAVED',
+            notes: notes || '',
             billDate: billDateObj
         });
 
         await bill.save();
 
-        // Create ledger entry
+        // Create ledger entry using Net Amount
         const ledger = new Ledger({
             boatId,
-            agentId: agentId || userId,
+            agentId,
             ownerId: boat.ownerId,
             billId: bill._id,
             type: 'DEBIT',
-            amount: grandTotal,
+            amount: netAmount,
             balance: 0,
             description: `Bill ${billNumber} created`,
             date: billDateObj
@@ -151,30 +178,68 @@ class BillService {
 
         await ledger.save();
 
+        // Update or insert rates into VoyageIncome for this voyage
+        if (voyageId && processedCatchEntries.length > 0) {
+            for (const entry of processedCatchEntries) {
+                let speciesId = null;
+                try {
+                    const fish = await Fish.findOne({ name: entry.speciesName, isDeleted: false });
+                    if (fish) {
+                        speciesId = fish._id;
+                    }
+                } catch (err) {
+                    logger.error(`Error resolving fish model for species ${entry.speciesName}:`, err);
+                }
+
+                try {
+                    await VoyageIncome.findOneAndUpdate(
+                        { voyageId, speciesName: entry.speciesName },
+                        {
+                            $set: {
+                                speciesId,
+                                quantity: entry.quantity,
+                                rate: entry.rate,
+                                amount: entry.amount,
+                                unit: 'kg'
+                            }
+                        },
+                        { upsert: true, new: true }
+                    );
+                } catch (err) {
+                    logger.error(`Failed to upsert VoyageIncome for voyage ${voyageId} and species ${entry.speciesName}:`, err);
+                }
+            }
+        }
+
         // Populate references
         const populatedBill = await Bill.findById(bill._id)
             .populate('boatId', 'boatNumber boatName')
             .populate('agentId', 'name email')
             .populate('staffId', 'name email')
-            .populate('buyerId', 'name email')
-            .populate('locationId', 'name')
-            .populate('subLocationId', 'name');
+            .populate('createdBy', 'name email')
+            .populate('voyageId', 'departureDate');
 
-        logger.info(`Bill created: ${billNumber} for boat ${boat.boatNumber}`);
+        logger.info(`Bill created: ${billNumber} for boat ${boat.boatNumber} by ${user.role}`);
         return populatedBill;
     }
 
     /**
      * Get bill by ID
-     * @param {string} billId - Bill ID
-     * @param {Object} user - Current user
-     * @returns {Promise<Object>} Bill with populated fields
      */
     async getBillById(billId, user) {
         const bill = await Bill.findById(billId)
-            .populate('boatId', 'boatNumber boatName')
-            .populate('agentId', 'name email')   // ✅ ADD THIS
-            .populate('staffId', 'name email')   // ✅ ADD THIS
+            .populate({
+                path: 'boatId',
+                select: 'boatNumber boatName ownerId',
+                populate: {
+                    path: 'ownerId',
+                    select: 'name email'
+                }
+            })
+            .populate('voyageId', 'departureDate')
+            .populate('agentId', 'name email')
+            .populate('staffId', 'name email')
+            .populate('createdBy', 'name email')
             .populate('buyerId', 'name email')
             .populate('locationId', 'name')
             .populate('subLocationId', 'name')
@@ -184,43 +249,73 @@ class BillService {
             throw new Error('Bill not found');
         }
 
+        if (bill.voyageId) {
+            bill.voyageId.voyageNo = bill.voyageId._id.toString().substring(18).toUpperCase();
+        }
+
         await this.checkBillAccess(bill, user);
         return bill;
     }
 
     /**
-     * Get bills with filters and pagination
-     * @param {Object} filters - Filter parameters
-     * @param {Object} pagination - Pagination parameters
-     * @param {Object} user - Current user
-     * @returns {Promise<Object>} Bills with pagination
+     * Get bills with filters and pagination (role filtered)
      */
     async getBills(filters, pagination, user) {
         const { page, limit, skip } = pagination;
 
-        // Build query based on user role
         const query = { isDeleted: false };
 
-        // Apply role-based filtering
-        await this.applyRoleFilter(query, user);
+        // Apply role filter & optional staffId query param
+        if (user.role === 'STAFF') {
+            query.$or = [
+                { createdBy: user._id },
+                { createdBy: user.agentId }
+            ];
+        } else if (user.role === 'COMMISSION_AGENT') {
+            const User = require('../models/usermodel');
+            const staff = await User.find({ agentId: user._id, role: 'STAFF', isDeleted: false }).select('_id').lean();
+            const staffIds = staff.map(s => s._id);
+
+            if (filters.filterType === 'MY_BILLS') {
+                query.createdBy = user._id;
+            } else if (filters.filterType === 'STAFF_BILLS') {
+                query.createdByRole = 'STAFF';
+                query.agentId = user._id;
+                if (filters.staffId) {
+                    query.staffId = filters.staffId;
+                }
+            } else {
+                // "All Bills"
+                query.$or = [
+                    { agentId: user._id },
+                    { staffId: { $in: staffIds } }
+                ];
+                if (filters.staffId) {
+                    query.staffId = filters.staffId;
+                }
+            }
+        } else if (user.role === 'BOAT_OWNER') {
+            const Boat = require('../models/boatmodel');
+            const ownerBoats = await Boat.find({ ownerId: user._id, isDeleted: false }).select('_id').lean();
+            const boatIds = ownerBoats.map(b => b._id);
+            query.boatId = { $in: boatIds };
+        } else if (user.role !== 'SUPER_ADMIN') {
+            query._id = null; // No access
+        }
 
         // Apply additional filters
         if (filters.boatId) query.boatId = filters.boatId;
-        if (filters.agentId) query.agentId = filters.agentId;
-        if (filters.buyerId) query.buyerId = filters.buyerId;
-        if (filters.locationId) query.locationId = filters.locationId;
         if (filters.status) query.status = filters.status;
+        if (filters.agentId && user.role === 'SUPER_ADMIN') query.agentId = filters.agentId;
 
-        // ✅ Handle date filtering - Single Date OR Date Range
+        // Handle date filtering - Single Date OR Date Range
         if (filters.date) {
-            // Single date filter
             const singleDate = new Date(filters.date);
             singleDate.setHours(0, 0, 0, 0);
             const endOfDay = new Date(singleDate);
             endOfDay.setHours(23, 59, 59, 999);
             query.billDate = { $gte: singleDate, $lte: endOfDay };
         } else {
-            // Date range filter
             if (filters.fromDate) {
                 query.billDate = { $gte: new Date(filters.fromDate) };
             }
@@ -253,6 +348,7 @@ class BillService {
                 .populate('boatId', 'boatNumber boatName')
                 .populate('agentId', 'name email')
                 .populate('staffId', 'name email')
+                .populate('createdBy', 'name email')
                 .populate('buyerId', 'name')
                 .sort({ [filters.sortBy || 'billDate']: filters.sortOrder === 'asc' ? 1 : -1 })
                 .skip(skip)
@@ -322,6 +418,39 @@ class BillService {
         }
 
         await bill.save();
+
+        // Update or insert rates into VoyageIncome for this voyage
+        if (bill.voyageId && updateData.fishEntries) {
+            for (const entry of bill.fishEntries) {
+                let speciesId = null;
+                try {
+                    const fish = await Fish.findOne({ name: entry.fishName, isDeleted: false });
+                    if (fish) {
+                        speciesId = fish._id;
+                    }
+                } catch (err) {
+                    logger.error(`Error resolving fish model for species ${entry.fishName}:`, err);
+                }
+
+                try {
+                    await VoyageIncome.findOneAndUpdate(
+                        { voyageId: bill.voyageId, speciesName: entry.fishName },
+                        {
+                            $set: {
+                                speciesId,
+                                quantity: entry.weightKg,
+                                rate: entry.pricePerKg,
+                                amount: entry.totalAmount,
+                                unit: 'kg'
+                            }
+                        },
+                        { upsert: true, new: true }
+                    );
+                } catch (err) {
+                    logger.error(`Failed to upsert VoyageIncome for voyage ${bill.voyageId} and species ${entry.fishName}:`, err);
+                }
+            }
+        }
 
         // Handle ledger entries on status change
         if (newStatus === 'CONFIRMED' && oldStatus !== 'CONFIRMED') {
@@ -408,17 +537,33 @@ class BillService {
     async checkBillAccess(bill, user) {
         if (user.role === 'SUPER_ADMIN') return true;
 
+        const getObjectIdStr = (val) => {
+            if (!val) return '';
+            if (typeof val === 'object' && val._id) return val._id.toString();
+            return val.toString();
+        };
+
+        const userIdStr = user._id.toString();
+
         let hasAccess = (
-            bill.agentId.toString() === user._id.toString() ||
-            bill.staffId?.toString() === user._id.toString() ||
-            bill.buyerId?.toString() === user._id.toString()
+            getObjectIdStr(bill.agentId) === userIdStr ||
+            getObjectIdStr(bill.staffId) === userIdStr ||
+            getObjectIdStr(bill.buyerId) === userIdStr
         );
 
         if (!hasAccess && user.role === 'BOAT_OWNER') {
-            const Boat = require('../models/boatmodel');
-            const boat = await Boat.findById(bill.boatId).lean();
-            if (boat && boat.ownerId.toString() === user._id.toString()) {
+            const boatOwnerId = (bill.boatId && typeof bill.boatId === 'object' && bill.boatId.ownerId)
+                ? getObjectIdStr(bill.boatId.ownerId)
+                : null;
+
+            if (boatOwnerId === userIdStr) {
                 hasAccess = true;
+            } else {
+                const Boat = require('../models/boatmodel');
+                const boat = await Boat.findById(getObjectIdStr(bill.boatId)).lean();
+                if (boat && boat.ownerId.toString() === userIdStr) {
+                    hasAccess = true;
+                }
             }
         }
 
@@ -497,6 +642,25 @@ class BillService {
         // Delete associated ledger entries
         await Ledger.deleteMany({ billId: bill._id });
         logger.info(`Ledger entries reversed for bill: ${bill.billNumber}`);
+    }
+
+    /**
+     * Cancel a bill
+     */
+    async cancelBill(billId, user) {
+        const bill = await Bill.findById(billId);
+        if (!bill) {
+            throw new Error('Bill not found');
+        }
+        await this.checkBillAccess(bill, user);
+
+        bill.status = 'CANCELLED';
+        await bill.save();
+
+        // Reverse ledger entries
+        await this.reverseLedgerEntries(bill);
+
+        return bill;
     }
 
     /**

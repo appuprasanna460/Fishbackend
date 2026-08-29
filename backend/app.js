@@ -30,6 +30,10 @@ const notificationRoutes = require('./routes/notificationroutes');
 const subscriptionPlanRoutes = require('./routes/subscriptionPlanRoutes');
 const subscriptionRoutes = require('./routes/subscriptionRoutes');
 const documentRoutes = require('./routes/documentroutes');
+const staffRoutes = require('./routes/staffroutes');
+const voyageRoutes = require('./routes/voyageRoutes');
+const catchRoutes = require('./routes/catchRoutes');
+const agentDashboardRoutes = require('./routes/agentDashboardRoutes');
 
 
 // Helper to wrap async handlers for Express 5
@@ -81,6 +85,10 @@ app.use('/api/notifications', notificationRoutes);
 app.use('/api/subscription-plans', subscriptionPlanRoutes);
 app.use('/api/subscription', subscriptionRoutes);
 app.use('/api/documents', documentRoutes);
+app.use('/api/staff', staffRoutes);
+app.use('/api/voyages', voyageRoutes);
+app.use('/api/catches', catchRoutes);
+app.use('/api/agent', agentDashboardRoutes);
 
 // Audit logging for all API routes
 app.use('/api', auditLog);

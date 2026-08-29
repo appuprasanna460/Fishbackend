@@ -125,7 +125,14 @@ const voyageSchema = new mongoose.Schema({
         default: false
     }
 }, {
-    timestamps: true
+    timestamps: true,
+    toJSON: { virtuals: true },
+    toObject: { virtuals: true }
+});
+
+// Virtual for voyageNo
+voyageSchema.virtual('voyageNo').get(function () {
+    return this._id.toString().substring(18).toUpperCase();
 });
 
 // Calculate fuelToCarry and iceToCarry before saving

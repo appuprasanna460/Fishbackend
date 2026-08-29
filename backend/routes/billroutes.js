@@ -51,4 +51,11 @@ router.delete('/:id',
     billController.deleteBill
 );
 
+router.patch('/:id/cancel',
+    authorize('COMMISSION_AGENT', 'STAFF', 'SUPER_ADMIN'),
+    validate(billIdSchema, 'params'),
+    auditLog,
+    billController.cancelBill
+);
+
 module.exports = router;

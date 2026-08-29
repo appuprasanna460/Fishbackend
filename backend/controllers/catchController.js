@@ -75,6 +75,30 @@ const hasPendingCatch = async (req, res) => {
     }
 };
 
+const getCatchesByVoyage = async (req, res) => {
+    try {
+        const catches = await catchService.getCatchesByVoyage(req.params.voyageId);
+        successResponse(res, 200, 'Catches retrieved successfully for voyage', catches);
+    } catch (error) {
+        logger.error('Get catches by voyage error:', error);
+        errorResponse(res, 500, error.message || 'Failed to retrieve catches');
+    }
+};
+
+const updateCatchRate = async (req, res) => {
+    try {
+        const { rate } = req.body;
+        if (rate === undefined || isNaN(Number(rate))) {
+            return errorResponse(res, 400, 'Valid rate is required');
+        }
+        const updated = await catchService.updateCatchRate(req.params.catchId, Number(rate));
+        successResponse(res, 200, 'Catch rate updated successfully', updated);
+    } catch (error) {
+        logger.error('Update catch rate error:', error);
+        errorResponse(res, 400, error.message || 'Failed to update catch rate');
+    }
+};
+
 module.exports = {
     createCatch,
     getCatchesByHaul,
@@ -82,5 +106,7 @@ module.exports = {
     updateCatch,
     deleteCatch,
     hasPendingCatch,
-    getCatchSummaryByVoyage
+    getCatchSummaryByVoyage,
+    getCatchesByVoyage,
+    updateCatchRate
 };

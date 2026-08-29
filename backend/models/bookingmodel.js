@@ -18,10 +18,31 @@ const bookingSchema = new mongoose.Schema({
         ref: 'User',
         required: true
     },
-    // ❌ NO ownerId
     bookingDate: {
         type: Date,
         default: Date.now
+    },
+    purpose: {
+        type: String,
+        enum: ['Fishing', 'Transport', 'Maintenance', 'Other'],
+        default: 'Fishing'
+    },
+    status: {
+        type: String,
+        enum: ['PENDING_APPROVAL', 'BOOKED', 'CONFIRMED', 'CANCELLED'],
+        default: 'PENDING_APPROVAL'
+    },
+    notes: {
+        type: String,
+        trim: true,
+        default: ''
+    },
+    approvedBy: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'User'
+    },
+    approvedAt: {
+        type: Date
     },
     isDeleted: {
         type: Boolean,
@@ -36,6 +57,8 @@ bookingSchema.index({ bookingNumber: 1 }, { unique: true, sparse: true });
 bookingSchema.index({ boatId: 1 });
 bookingSchema.index({ agentId: 1 });
 bookingSchema.index({ isDeleted: 1 });
+bookingSchema.index({ status: 1 });
+bookingSchema.index({ agentId: 1, status: 1 });
 
 // ✅ Pre-save middleware to generate booking number
 bookingSchema.pre('save', async function () {

@@ -16,12 +16,6 @@ exports.getBoats = async (req, res, next) => {
         if (userRole === 'BOAT_OWNER') {
             // Boat owners can only see their own boats
             filter.ownerId = userId;
-        } else if (userRole === 'COMMISSION_AGENT') {
-            // Commission agents can see boats under them
-            filter.agentId = userId;
-        } else if (userRole === 'STAFF') {
-            // Staff can see boats under their agent
-            filter.agentId = req.user.agentId;
         }
         // SUPER_ADMIN can see all boats
 

@@ -42,6 +42,28 @@ const boatIdSchema = Joi.object({
 // All booking routes require authentication
 router.use(authenticate);
 
+// Get bookings for agent
+router.get('/',
+    bookingController.getAgentBookings
+);
+
+// Get active booked boats
+router.get('/active',
+    bookingController.getActiveBookedBoats
+);
+
+// Get bookings for owner's boats
+router.get('/owner-bookings',
+    authorize('BOAT_OWNER'),
+    bookingController.getOwnerBookings
+);
+
+// Update booking status
+router.patch('/:id/status',
+    authorize('BOAT_OWNER', 'SUPER_ADMIN'),
+    bookingController.updateBookingStatus
+);
+
 // Get agent's bookings
 router.get('/my-bookings',
     bookingController.getAgentBookings

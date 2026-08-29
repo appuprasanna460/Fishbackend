@@ -214,6 +214,34 @@ const userSchema = new mongoose.Schema({
         type: Boolean,
         default: false
     },
+    age: {
+        type: Number,
+        min: 18,
+        max: 100
+    },
+    documents: [{
+        id: {
+            type: mongoose.Schema.Types.ObjectId,
+            auto: true
+        },
+        name: {
+            type: String,
+            required: true,
+            trim: true
+        },
+        url: {
+            type: String,
+            required: true
+        },
+        key: {
+            type: String,
+            required: true
+        },
+        uploadedAt: {
+            type: Date,
+            default: Date.now
+        }
+    }],
     lastLogin: {
         type: Date
     },
@@ -237,6 +265,8 @@ userSchema.index({ role: 1 });
 userSchema.index({ agentId: 1 });
 userSchema.index({ locationId: 1 });
 userSchema.index({ isActive: 1, isDeleted: 1 });
+userSchema.index({ agentId: 1, role: 1 });
+userSchema.index({ agentId: 1, isActive: 1 });
 
 // ✅ FIXED: Pre-save middleware without 'next'
 userSchema.pre('save', async function () {

@@ -76,6 +76,48 @@ const getVoyageStats = async (req, res) => {
     }
 };
 
+const getActiveVoyages = async (req, res) => {
+    try {
+        const agentId = req.query.agentId || (['COMMISSION_AGENT', 'STAFF'].includes(req.user.role) ? (req.user.agentId || req.user._id) : null);
+        if (!agentId) {
+            return errorResponse(res, 400, 'agentId is required');
+        }
+        const voyages = await voyageService.getActiveVoyagesForAgent(agentId);
+        successResponse(res, 200, 'Active voyages retrieved successfully', voyages);
+    } catch (error) {
+        logger.error('Get active voyages error:', error);
+        errorResponse(res, 500, error.message || 'Failed to retrieve active voyages');
+    }
+};
+
+const getVoyagesByBoat = async (req, res) => {
+    try {
+        const { boatId } = req.params;
+        const { status } = req.query; // e.g. ACTIVE,PLANNED
+        
+        let filter = { boatId, isDeleted: false };
+        if (status) {
+            filter.status = { $in: status.split(',') };
+        }
+        
+        const voyages = await voyageService.getVoyagesByFilter(filter);
+        successResponse(res, 200, 'Voyages retrieved successfully', voyages.map(voyage => ({
+            id: voyage._id,
+            voyageNo: voyage.voyageNo || voyage._id.toString().substring(18).toUpperCase(),
+            boatId: voyage.boatId?._id || voyage.boatId,
+            boatName: voyage.boatId?.boatName || '',
+            boatNumber: voyage.boatId?.boatNumber || '',
+            status: voyage.status,
+            departureDate: voyage.departureDate,
+            captainName: voyage.captainId?.name || '',
+            crewCount: voyage.crewMembers ? voyage.crewMembers.length : 0
+        })));
+    } catch (error) {
+        logger.error('Get voyages by boat error:', error);
+        errorResponse(res, 500, error.message || 'Failed to retrieve voyages');
+    }
+};
+
 module.exports = {
     createVoyage,
     getVoyages,
@@ -83,5 +125,7 @@ module.exports = {
     updateVoyage,
     updateVoyageStatus,
     deleteVoyage,
-    getVoyageStats
+    getVoyageStats,
+    getActiveVoyages,
+    getVoyagesByBoat
 };
