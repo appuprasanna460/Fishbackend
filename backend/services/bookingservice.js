@@ -273,6 +273,82 @@ class BookingService {
             };
         });
     }
+
+    /**
+     * Deactivate a booking by the boat owner (sets status to CANCELLED)
+     */
+    async deactivateBookingByOwner(bookingId, ownerId) {
+        const booking = await Booking.findOne({ _id: bookingId, isDeleted: false });
+        if (!booking) {
+            throw new NotFoundError('Booking not found');
+        }
+
+        // Verify the boat belongs to this owner
+        const boat = await Boat.findOne({ _id: booking.boatId, ownerId, isDeleted: false });
+        if (!boat) {
+            throw new AppError('You are not authorised to modify this booking', 403);
+        }
+
+        booking.status = 'CANCELLED';
+        await booking.save();
+
+        // Notify the commission agent
+        try {
+            const Notification = require('../models/notificationmodel');
+            await Notification.create({
+                userId: booking.agentId,
+                type: 'BOOKING_CANCELLED',
+                title: 'Booking Deactivated',
+                message: `Your booking for boat "${boat.boatName}" has been deactivated by the boat owner.`,
+                relatedId: booking._id,
+                relatedType: 'BOOKING'
+            });
+        } catch (err) {
+            logger.error('Failed to create deactivation notification:', err);
+        }
+
+        logger.info(`Booking ${booking.bookingNumber} deactivated by owner ${ownerId}`);
+        return booking;
+    }
+
+    /**
+     * Activate a booking by the boat owner (restores status to CONFIRMED)
+     */
+    async activateBookingByOwner(bookingId, ownerId) {
+        const booking = await Booking.findOne({ _id: bookingId, isDeleted: false });
+        if (!booking) {
+            throw new NotFoundError('Booking not found');
+        }
+
+        // Verify the boat belongs to this owner
+        const boat = await Boat.findOne({ _id: booking.boatId, ownerId, isDeleted: false });
+        if (!boat) {
+            throw new AppError('You are not authorised to modify this booking', 403);
+        }
+
+        booking.status = 'CONFIRMED';
+        booking.approvedBy = ownerId;
+        booking.approvedAt = new Date();
+        await booking.save();
+
+        // Notify the commission agent
+        try {
+            const Notification = require('../models/notificationmodel');
+            await Notification.create({
+                userId: booking.agentId,
+                type: 'BOOKING_APPROVED',
+                title: 'Booking Activated',
+                message: `Your booking for boat "${boat.boatName}" has been activated by the boat owner.`,
+                relatedId: booking._id,
+                relatedType: 'BOOKING'
+            });
+        } catch (err) {
+            logger.error('Failed to create activation notification:', err);
+        }
+
+        logger.info(`Booking ${booking.bookingNumber} activated by owner ${ownerId}`);
+        return booking;
+    }
 }
 
 module.exports = new BookingService();

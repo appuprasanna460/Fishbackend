@@ -161,6 +161,41 @@ const getOwnerBookings = async (req, res, next) => {
     }
 };
 
+
+/**
+ * Deactivate a booking by the boat owner (sets status to CANCELLED)
+ */
+const deactivateBooking = async (req, res, next) => {
+    try {
+        const booking = await bookingService.deactivateBookingByOwner(req.params.id, req.user._id);
+        successResponse(res, 200, 'Booking deactivated successfully', {
+            id: booking._id,
+            status: booking.status
+        });
+    } catch (error) {
+        logger.error('Deactivate booking error:', error);
+        const statusCode = error.statusCode || 400;
+        errorResponse(res, statusCode, error.message || 'Failed to deactivate booking');
+    }
+};
+
+/**
+ * Activate a booking by the boat owner (restores to CONFIRMED)
+ */
+const activateBooking = async (req, res, next) => {
+    try {
+        const booking = await bookingService.activateBookingByOwner(req.params.id, req.user._id);
+        successResponse(res, 200, 'Booking activated successfully', {
+            id: booking._id,
+            status: booking.status
+        });
+    } catch (error) {
+        logger.error('Activate booking error:', error);
+        const statusCode = error.statusCode || 400;
+        errorResponse(res, statusCode, error.message || 'Failed to activate booking');
+    }
+};
+
 module.exports = {
     createBooking,
     getAgentBookings,
@@ -172,5 +207,7 @@ module.exports = {
     getAgentBookedBoats,
     updateBookingStatus,
     getActiveBookedBoats,
-    getOwnerBookings
+    getOwnerBookings,
+    deactivateBooking,
+    activateBooking
 };

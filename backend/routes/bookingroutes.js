@@ -112,4 +112,17 @@ router.get('/all',
 router.get('/my-booked-boats',
     bookingController.getAgentBookedBoats
 );
+
+// Owner: deactivate a booking (commission agent loses access)
+router.patch('/:id/deactivate',
+    authorize('BOAT_OWNER'),
+    bookingController.deactivateBooking
+);
+
+// Owner: re-activate a booking
+router.patch('/:id/activate',
+    authorize('BOAT_OWNER'),
+    bookingController.activateBooking
+);
+
 module.exports = router;
