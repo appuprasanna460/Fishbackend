@@ -26,6 +26,11 @@ const voyageCrewSettlementSchema = new mongoose.Schema({
         default: 0,
         min: 0
     },
+    paidAmount: {
+        type: Number,
+        default: 0,
+        min: 0
+    },
     paid: {
         type: Boolean,
         default: false

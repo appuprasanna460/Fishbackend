@@ -1,9 +1,31 @@
 const Voyage = require('../models/voyageModel');
+const VoyageDraft = require('../models/voyageDraftModel');
 const Crew = require('../models/crewModel');
 const Boat = require('../models/boatmodel');
 const Bill = require('../models/billmodel');
 
 class VoyageService {
+    // ---- DRAFT LOGIC ----
+    async saveDraft(data, ownerId) {
+        let draft = await VoyageDraft.findOne({ ownerId });
+        if (draft) {
+            draft.draftData = data;
+        } else {
+            draft = new VoyageDraft({ ownerId, draftData: data });
+        }
+        await draft.save();
+        return draft;
+    }
+
+    async getDraft(ownerId) {
+        return await VoyageDraft.findOne({ ownerId });
+    }
+
+    async deleteDraft(ownerId) {
+        return await VoyageDraft.findOneAndDelete({ ownerId });
+    }
+    // ---------------------
+
     // Create a new voyage (auto-assigns ownerId from logged-in user)
     async createVoyage(data, ownerId) {
         if (!data.endDate && data.departureDate && data.expectedDuration) {

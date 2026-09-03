@@ -35,11 +35,17 @@ class AuthService {
 
         // Update last login
         user.lastLogin = new Date();
+        // Increment token version to invalidate old sessions
+        user.tokenVersion = (user.tokenVersion || 0) + 1;
+        
+        // Enforce single device by clearing old refresh tokens
+        user.refreshTokens = [];
+        
         await user.save();
 
         // Generate tokens
-        const accessToken = jwtUtils.generateAccessToken(user._id, user.role);
-        const refreshToken = jwtUtils.generateRefreshToken(user._id, user.role);
+        const accessToken = jwtUtils.generateAccessToken(user._id, user.role, user.tokenVersion);
+        const refreshToken = jwtUtils.generateRefreshToken(user._id, user.role, user.tokenVersion);
 
         // Store refresh token
         const expiresAt = new Date();
@@ -83,7 +89,7 @@ class AuthService {
             }
 
             // Generate new access token
-            const accessToken = jwtUtils.generateAccessToken(user._id, user.role);
+            const accessToken = jwtUtils.generateAccessToken(user._id, user.role, user.tokenVersion);
 
             return {
                 accessToken,

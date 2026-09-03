@@ -266,6 +266,9 @@ router.put('/crew/:id/availability', validate(idParamSchema, 'params'), crewCont
 router.delete('/crew/:id', validate(idParamSchema, 'params'), crewController.deleteCrew);
 
 // ─── Voyage Routes ────────────────────────────────────────────────────────────
+router.post('/voyages/draft', voyageController.saveDraft);
+router.get('/voyages/draft', voyageController.getDraft);
+router.delete('/voyages/draft', voyageController.deleteDraft);
 router.post('/voyages', validate(createVoyageSchema), voyageController.createVoyage);
 router.get('/voyages', voyageController.getVoyages);
 router.get('/voyages/stats', voyageController.getVoyageStats);

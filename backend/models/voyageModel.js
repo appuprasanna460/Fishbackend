@@ -59,6 +59,10 @@ const voyageSchema = new mongoose.Schema({
         default: 'PLANNED'
     },
     supplies: {
+        fuelType: {
+            type: String,
+            default: 'STANDARD DIESEL'
+        },
         fuelRequired: {
             type: Number,
             default: 0

@@ -5,12 +5,48 @@ const logger = require('../config/logger');
 const createVoyage = async (req, res) => {
     try {
         const voyage = await voyageService.createVoyage(req.body, req.user._id);
+        
+        // Also delete draft since voyage is created
+        await voyageService.deleteDraft(req.user._id);
+        
         successResponse(res, 201, 'Voyage created successfully', voyage);
     } catch (error) {
         logger.error('Create voyage error:', error);
         errorResponse(res, 400, error.message || 'Failed to create voyage');
     }
 };
+
+// ---- DRAFT LOGIC ----
+const saveDraft = async (req, res) => {
+    try {
+        const draft = await voyageService.saveDraft(req.body, req.user._id);
+        successResponse(res, 200, 'Draft saved successfully', draft);
+    } catch (error) {
+        logger.error('Save draft error:', error);
+        errorResponse(res, 400, error.message || 'Failed to save draft');
+    }
+};
+
+const getDraft = async (req, res) => {
+    try {
+        const draft = await voyageService.getDraft(req.user._id);
+        successResponse(res, 200, 'Draft retrieved successfully', draft ? draft.draftData : null);
+    } catch (error) {
+        logger.error('Get draft error:', error);
+        errorResponse(res, 500, error.message || 'Failed to retrieve draft');
+    }
+};
+
+const deleteDraft = async (req, res) => {
+    try {
+        await voyageService.deleteDraft(req.user._id);
+        successResponse(res, 200, 'Draft deleted successfully');
+    } catch (error) {
+        logger.error('Delete draft error:', error);
+        errorResponse(res, 400, error.message || 'Failed to delete draft');
+    }
+};
+// ---------------------
 
 const getVoyages = async (req, res) => {
     try {
@@ -127,5 +163,8 @@ module.exports = {
     deleteVoyage,
     getVoyageStats,
     getActiveVoyages,
-    getVoyagesByBoat
+    getVoyagesByBoat,
+    saveDraft,
+    getDraft,
+    deleteDraft
 };

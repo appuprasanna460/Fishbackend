@@ -5,11 +5,12 @@ const env = require('../config/env');
  * Generate access token
  * @param {string} userId - User ID
  * @param {string} role - User role
+ * @param {number} tokenVersion - Token version
  * @returns {string} Access token
  */
-const generateAccessToken = (userId, role) => {
+const generateAccessToken = (userId, role, tokenVersion = 0) => {
     return jwt.sign(
-        { userId, role },
+        { userId, role, tokenVersion },
         env.accessTokenSecret,
         { expiresIn: env.accessTokenExpiry }
     );
@@ -19,11 +20,12 @@ const generateAccessToken = (userId, role) => {
  * Generate refresh token
  * @param {string} userId - User ID
  * @param {string} role - User role
+ * @param {number} tokenVersion - Token version
  * @returns {string} Refresh token
  */
-const generateRefreshToken = (userId, role) => {
+const generateRefreshToken = (userId, role, tokenVersion = 0) => {
     return jwt.sign(
-        { userId, role },
+        { userId, role, tokenVersion },
         env.refreshTokenSecret,
         { expiresIn: env.refreshTokenExpiry }
     );

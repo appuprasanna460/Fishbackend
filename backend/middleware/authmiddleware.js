@@ -26,6 +26,11 @@ const authenticate = async (req, res, next) => {
                 return errorResponse(res, 401, 'User no longer exists');
             }
 
+            // Check for concurrent login
+            if (decoded.tokenVersion !== user.tokenVersion) {
+                return errorResponse(res, 401, 'Session superseded. Logged in from another device.', { code: 'SESSION_SUPERSEDED' });
+            }
+
             // Allow expired users to still hit subscription endpoints (for renewal flow)
             const isSubscriptionRoute = req.path.startsWith('/api/subscription') ||
                 req.originalUrl.includes('/subscription');

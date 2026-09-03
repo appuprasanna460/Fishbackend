@@ -51,8 +51,7 @@ const computeVoyagesPL = async (voyages) => {
         // 2. Calculate Expenses
         const voyageExpTotal = expensesMap[vId].reduce((sum, item) => sum + (item.amount || 0), 0);
         const crewSettTotal = crewSettlementsMap[vId]
-            .filter(item => item.paid)
-            .reduce((sum, item) => sum + (item.advance || 0), 0);
+            .reduce((sum, item) => sum + (item.paidAmount !== undefined && item.paidAmount > 0 ? item.paidAmount : (item.paid ? (item.advance || 0) : 0)), 0);
         const totalExpenses = voyageExpTotal + crewSettTotal;
 
         // 3. Profit calculations
@@ -373,6 +372,7 @@ const getVoyagePLSummary = async (req, res) => {
                 crewMemberName: voyage.captainId.name,
                 role: 'Captain',
                 advance: savedSett ? savedSett.advance : 0,
+                paidAmount: savedSett ? (savedSett.paidAmount !== undefined ? savedSett.paidAmount : (savedSett.paid ? savedSett.advance : 0)) : 0,
                 paid: savedSett ? savedSett.paid : false
             });
         }
@@ -387,6 +387,7 @@ const getVoyagePLSummary = async (req, res) => {
                     crewMemberName: member.name,
                     role: member.role || 'Crew',
                     advance: savedSett ? savedSett.advance : 0,
+                    paidAmount: savedSett ? (savedSett.paidAmount !== undefined ? savedSett.paidAmount : (savedSett.paid ? savedSett.advance : 0)) : 0,
                     paid: savedSett ? savedSett.paid : false
                 });
             });
@@ -663,7 +664,8 @@ const upsertCrewSettlement = async (req, res) => {
         }
 
         for (const item of settlements) {
-            const { crewMemberId, crewMemberName, role, advance, paid } = item;
+            const { crewMemberId, crewMemberName, role, advance, paidAmount, paid } = item;
+            const parsedPaidAmt = paidAmount !== undefined ? parseFloat(paidAmount || 0) : (paid ? parseFloat(advance || 0) : 0);
 
             await VoyageCrewSettlement.findOneAndUpdate(
                 { voyageId, crewMemberId },
@@ -673,6 +675,7 @@ const upsertCrewSettlement = async (req, res) => {
                     crewMemberName,
                     role,
                     advance: parseFloat(advance || 0),
+                    paidAmount: parsedPaidAmt,
                     paid: !!paid
                 },
                 { upsert: true, new: true }
