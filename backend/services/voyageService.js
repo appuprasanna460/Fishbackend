@@ -3,6 +3,7 @@ const VoyageDraft = require('../models/voyageDraftModel');
 const Crew = require('../models/crewModel');
 const Boat = require('../models/boatmodel');
 const Bill = require('../models/billmodel');
+const VoyageFinancialExpense = require('../models/voyageFinancialExpenseModel');
 
 class VoyageService {
     // ---- DRAFT LOGIC ----
@@ -40,29 +41,39 @@ class VoyageService {
             data.endDate = endDate;
         }
 
+        const targetStatus = data.status || 'PLANNED';
+        delete data.status;
+
         const voyage = new Voyage({
+            status: targetStatus,
             ...data,
-            ownerId,
-            status: 'PLANNED'
+            ownerId
         });
+        voyage.status = targetStatus;
 
         await voyage.save();
+        console.log('=== VOYAGE CREATED === id:', voyage._id, 'status:', voyage.status);
+        await this._syncFuelExpenses(voyage);
 
-        // Lock crew members availability
-        const allAssignedCrew = [voyage.captainId, ...voyage.crewMembers];
-        await Crew.updateMany(
-            { _id: { $in: allAssignedCrew } },
-            { 
-                $set: { 
-                    isAvailable: false, 
-                    assignedTo: { 
-                        voyageId: voyage._id, 
-                        boatId: voyage.boatId, 
-                        assignedAt: new Date() 
-                    } 
-                } 
+        // Lock crew members availability ONLY if not in DRAFT status
+        if (voyage.status !== 'DRAFT') {
+            const allAssignedCrew = [voyage.captainId, ...voyage.crewMembers].filter(Boolean);
+            if (allAssignedCrew.length > 0) {
+                await Crew.updateMany(
+                    { _id: { $in: allAssignedCrew } },
+                    { 
+                        $set: { 
+                            isAvailable: false, 
+                            assignedTo: { 
+                                voyageId: voyage._id, 
+                                boatId: voyage.boatId, 
+                                assignedAt: new Date() 
+                            } 
+                        } 
+                    }
+                );
             }
-        );
+        }
 
         return voyage;
     }
@@ -138,7 +149,10 @@ class VoyageService {
             throw new Error('Completed or cancelled voyages cannot be edited');
         }
 
-        const oldCrew = [voyage.captainId.toString(), ...voyage.crewMembers.map(c => c.toString())];
+        const oldCrew = [
+            voyage.captainId ? voyage.captainId.toString() : null, 
+            ...(voyage.crewMembers || []).map(c => c ? c.toString() : null)
+        ].filter(Boolean);
         
         let updateFields = {};
         
@@ -149,13 +163,19 @@ class VoyageService {
             if (supplies !== undefined) updateFields.supplies = supplies;
             if (checklist !== undefined) updateFields.checklist = checklist;
         } else {
-            // Full edit for PLANNED
-            const { status, startedAt, completedAt, cancelledAt, ...allUpdateFields } = data;
+            // Full edit for DRAFT or PLANNED
+            const { startedAt, completedAt, cancelledAt, ...allUpdateFields } = data;
             updateFields = allUpdateFields;
         }
-        
+
         Object.assign(voyage, updateFields);
+
+        if (data.status && ['DRAFT', 'PLANNED'].includes(data.status)) {
+            voyage.status = data.status;
+        }
+
         await voyage.save();
+        console.log('=== VOYAGE UPDATED === id:', voyage._id, 'status:', voyage.status);
 
         if (updateFields.checklist !== undefined) {
             const VoyageChecklist = require('../models/voyageChecklistModel');
@@ -172,36 +192,138 @@ class VoyageService {
             );
         }
 
-        const newCrew = [voyage.captainId.toString(), ...voyage.crewMembers.map(c => c.toString())];
+        // Lock/release crew members availability only if not DRAFT status
+        if (voyage.status !== 'DRAFT') {
+            const newCrew = [
+                voyage.captainId ? voyage.captainId.toString() : null,
+                ...(voyage.crewMembers || []).map(c => c ? c.toString() : null)
+            ].filter(Boolean);
 
-        // Release crew members that are no longer part of this voyage
-        const releasedCrew = oldCrew.filter(c => !newCrew.includes(c));
-        if (releasedCrew.length > 0) {
-            await Crew.updateMany(
-                { _id: { $in: releasedCrew } },
-                { $set: { isAvailable: true, assignedTo: null } }
-            );
-        }
+            // Release crew members that are no longer part of this voyage
+            const releasedCrew = oldCrew.filter(c => !newCrew.includes(c));
+            if (releasedCrew.length > 0) {
+                await Crew.updateMany(
+                    { _id: { $in: releasedCrew } },
+                    { $set: { isAvailable: true, assignedTo: null } }
+                );
+            }
 
-        // Lock newly assigned crew members
-        const reservedCrew = newCrew.filter(c => !oldCrew.includes(c));
-        if (reservedCrew.length > 0) {
-            await Crew.updateMany(
-                { _id: { $in: reservedCrew } },
-                { 
-                    $set: { 
-                        isAvailable: false, 
-                        assignedTo: { 
-                            voyageId: voyage._id, 
-                            boatId: voyage.boatId, 
-                            assignedAt: new Date() 
+            // Lock newly assigned crew members
+            const reservedCrew = newCrew.filter(c => !oldCrew.includes(c));
+            if (reservedCrew.length > 0) {
+                await Crew.updateMany(
+                    { _id: { $in: reservedCrew } },
+                    { 
+                        $set: { 
+                            isAvailable: false, 
+                            assignedTo: { 
+                                voyageId: voyage._id, 
+                                boatId: voyage.boatId, 
+                                assignedAt: new Date() 
+                            } 
                         } 
-                    } 
-                }
-            );
+                    }
+                );
+            }
         }
+
+        await voyage.save();
+        await this._syncFuelExpenses(voyage);
 
         return voyage;
+    }
+
+    async _syncFuelExpenses(voyage) {
+        if (voyage && voyage.supplies) {
+            let totalFuelAmount = voyage.supplies.totalAmount || 0;
+            let totalFuelQty = voyage.supplies.fuelToCarry || 0;
+
+            if (Array.isArray(voyage.supplies.fuelItems) && voyage.supplies.fuelItems.length > 0) {
+                let calcTotalAmt = 0;
+                let calcTotalQty = 0;
+                for (const item of voyage.supplies.fuelItems) {
+                    const itemQty = item.fuelToCarry || 0;
+                    const itemAmt = item.amount || (itemQty * (item.rate || 0));
+                    calcTotalAmt += itemAmt;
+                    calcTotalQty += itemQty;
+
+                    if (itemQty > 0 || itemAmt > 0) {
+                        await VoyageFinancialExpense.findOneAndUpdate(
+                            { voyageId: voyage._id, expenseName: `Fuel (${item.fuelType})` },
+                            {
+                                voyageId: voyage._id,
+                                expenseName: `Fuel (${item.fuelType})`,
+                                quantity: itemQty,
+                                unit: 'L',
+                                rate: item.rate || 0,
+                                amount: itemAmt,
+                                isCustom: false
+                            },
+                            { upsert: true, new: true }
+                        );
+                    }
+                }
+                if (calcTotalAmt > 0) totalFuelAmount = calcTotalAmt;
+                if (calcTotalQty > 0) totalFuelQty = calcTotalQty;
+            }
+
+            if (totalFuelAmount > 0 || totalFuelQty > 0) {
+                const avgRate = totalFuelQty > 0 ? (totalFuelAmount / totalFuelQty) : 0;
+                await VoyageFinancialExpense.findOneAndUpdate(
+                    { voyageId: voyage._id, expenseName: 'Fuel' },
+                    {
+                        voyageId: voyage._id,
+                        expenseName: 'Fuel',
+                        quantity: totalFuelQty,
+                        unit: 'L',
+                        rate: avgRate,
+                        amount: totalFuelAmount,
+                        isCustom: false
+                    },
+                    { upsert: true, new: true }
+                );
+            }
+
+            // Sync Ice expense
+            const iceQty = voyage.supplies.iceToCarry || 0;
+            const iceRate = voyage.supplies.iceRate || 0;
+            const iceAmt = voyage.supplies.iceAmount || (iceQty * iceRate);
+            if (iceQty > 0 || iceAmt > 0) {
+                await VoyageFinancialExpense.findOneAndUpdate(
+                    { voyageId: voyage._id, expenseName: 'Ice' },
+                    {
+                        voyageId: voyage._id,
+                        expenseName: 'Ice',
+                        quantity: iceQty,
+                        unit: 'Kgs',
+                        rate: iceRate,
+                        amount: iceAmt,
+                        isCustom: false
+                    },
+                    { upsert: true, new: true }
+                );
+            }
+
+            // Sync Water expense
+            const waterQty = voyage.supplies.water || 0;
+            const waterRate = voyage.supplies.waterRate || 0;
+            const waterAmt = voyage.supplies.waterAmount || (waterQty * waterRate);
+            if (waterQty > 0 || waterAmt > 0) {
+                await VoyageFinancialExpense.findOneAndUpdate(
+                    { voyageId: voyage._id, expenseName: 'Water' },
+                    {
+                        voyageId: voyage._id,
+                        expenseName: 'Water',
+                        quantity: waterQty,
+                        unit: 'Ltrs',
+                        rate: waterRate,
+                        amount: waterAmt,
+                        isCustom: false
+                    },
+                    { upsert: true, new: true }
+                );
+            }
+        }
     }
 
     // Update voyage status (Start/Cancel/Complete)

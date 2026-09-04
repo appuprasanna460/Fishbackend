@@ -132,49 +132,39 @@ const updateCrewSchema = Joi.object({
 
 // Voyage Validations
 const createVoyageSchema = Joi.object({
-    boatId: objectId.required(),
-    captainId: objectId.required(),
-    crewMembers: Joi.array().items(objectId).required().min(1),
-    departureHarbour: objectId.required(),
-    departureDate: Joi.date().required(),
-    departureTime: Joi.string().required(),
-    voyageType: Joi.string().required().valid('DEEP_SEA', 'UNDERDEEP'),
-    expectedDuration: Joi.string().required().valid('5-7_DAYS', '8-9_DAYS'),
+    status: Joi.string().valid('DRAFT', 'PLANNED', 'ACTIVE', 'COMPLETED', 'CANCELLED').default('PLANNED'),
+    boatId: objectId.when('status', { is: 'DRAFT', then: Joi.optional(), otherwise: Joi.required() }),
+    captainId: objectId.when('status', { is: 'DRAFT', then: Joi.optional(), otherwise: Joi.required() }),
+    crewMembers: Joi.when('status', { is: 'DRAFT', then: Joi.array().items(objectId).optional(), otherwise: Joi.array().items(objectId).min(1).required() }),
+    departureHarbour: objectId.when('status', { is: 'DRAFT', then: Joi.optional(), otherwise: Joi.required() }),
+    departureHarbourName: Joi.string().allow('', null),
+    departureDate: Joi.date().when('status', { is: 'DRAFT', then: Joi.optional(), otherwise: Joi.required() }),
+    departureTime: Joi.string().when('status', { is: 'DRAFT', then: Joi.optional(), otherwise: Joi.required() }),
+    voyageType: Joi.string().valid('DEEP_SEA', 'UNDERDEEP').default('DEEP_SEA'),
+    expectedDuration: Joi.string().valid('5-7_DAYS', '8-9_DAYS').default('5-7_DAYS'),
     targetSpecies: Joi.array().items(objectId).allow(null),
-    supplies: Joi.object({
-        fuelRequired: Joi.number().required().min(0),
-        fuelInTank: Joi.number().required().min(0),
-        iceRequired: Joi.number().required().min(0),
-        iceInStock: Joi.number().required().min(0),
-        water: Joi.number().required().min(0),
-        foodSupplies: Joi.string().allow('', null),
-        otherSupplies: Joi.string().allow('', null)
-    }).required(),
+    targetSpeciesNames: Joi.array().items(Joi.string()).allow(null),
+    supplies: Joi.object().unknown(true).allow(null),
     notes: Joi.string().allow('', null)
-});
+}).unknown(true);
 
 const updateVoyageSchema = Joi.object({
-    boatId: objectId,
-    captainId: objectId,
-    crewMembers: Joi.array().items(objectId).min(1),
-    departureHarbour: objectId,
-    departureDate: Joi.date(),
-    departureTime: Joi.string(),
+    status: Joi.string().valid('DRAFT', 'PLANNED', 'ACTIVE', 'COMPLETED', 'CANCELLED'),
+    boatId: objectId.allow(null),
+    captainId: objectId.allow(null),
+    crewMembers: Joi.array().items(objectId),
+    departureHarbour: objectId.allow(null),
+    departureHarbourName: Joi.string().allow('', null),
+    departureDate: Joi.date().allow(null),
+    departureTime: Joi.string().allow('', null),
     voyageType: Joi.string().valid('DEEP_SEA', 'UNDERDEEP'),
     expectedDuration: Joi.string().valid('5-7_DAYS', '8-9_DAYS'),
     targetSpecies: Joi.array().items(objectId).allow(null),
-    supplies: Joi.object({
-        fuelRequired: Joi.number().min(0),
-        fuelInTank: Joi.number().min(0),
-        iceRequired: Joi.number().min(0),
-        iceInStock: Joi.number().min(0),
-        water: Joi.number().min(0),
-        foodSupplies: Joi.string().allow('', null),
-        otherSupplies: Joi.string().allow('', null)
-    }),
+    targetSpeciesNames: Joi.array().items(Joi.string()).allow(null),
+    supplies: Joi.object().unknown(true).allow(null),
     checklist: Joi.object().unknown(true).allow(null),
     notes: Joi.string().allow('', null)
-}).min(1);
+}).unknown(true);
 
 const updateVoyageStatusSchema = Joi.object({
     status: Joi.string().required().valid('ACTIVE', 'COMPLETED', 'CANCELLED')

@@ -1,10 +1,12 @@
 const mongoose = require('mongoose');
 
+const notDraft = function() { return this.status !== 'DRAFT'; };
+
 const voyageSchema = new mongoose.Schema({
     boatId: {
         type: mongoose.Schema.Types.ObjectId,
         ref: 'Boat',
-        required: true
+        required: notDraft
     },
     ownerId: {
         type: mongoose.Schema.Types.ObjectId,
@@ -14,38 +16,37 @@ const voyageSchema = new mongoose.Schema({
     captainId: {
         type: mongoose.Schema.Types.ObjectId,
         ref: 'Crew',
-        required: true
+        required: notDraft
     },
     crewMembers: [{
         type: mongoose.Schema.Types.ObjectId,
-        ref: 'Crew',
-        required: true
+        ref: 'Crew'
     }],
     departureHarbour: {
         type: mongoose.Schema.Types.ObjectId,
         ref: 'Harbour',
-        required: true
+        required: notDraft
     },
     departureDate: {
         type: Date,
-        required: true
+        required: notDraft
     },
     departureTime: {
         type: String,
-        required: true
+        required: notDraft
     },
     endDate: {
         type: Date,
-        required: true
+        required: notDraft
     },
     voyageType: {
         type: String,
-        required: true,
+        required: notDraft,
         enum: ['DEEP_SEA', 'UNDERDEEP']
     },
     expectedDuration: {
         type: String,
-        required: true,
+        required: notDraft,
         enum: ['5-7_DAYS', '8-9_DAYS']
     },
     targetSpecies: [{
@@ -55,10 +56,35 @@ const voyageSchema = new mongoose.Schema({
     status: {
         type: String,
         required: true,
-        enum: ['PLANNED', 'ACTIVE', 'COMPLETED', 'CANCELLED'],
-        default: 'PLANNED'
+        enum: ['DRAFT', 'PLANNED', 'ACTIVE', 'COMPLETED', 'CANCELLED']
     },
     supplies: {
+        fuelItems: [{
+            fuelType: {
+                type: String,
+                required: true
+            },
+            fuelRequired: {
+                type: Number,
+                default: 0
+            },
+            fuelInTank: {
+                type: Number,
+                default: 0
+            },
+            fuelToCarry: {
+                type: Number,
+                default: 0
+            },
+            rate: {
+                type: Number,
+                default: 0
+            },
+            amount: {
+                type: Number,
+                default: 0
+            }
+        }],
         fuelType: {
             type: String,
             default: 'STANDARD DIESEL'
@@ -75,6 +101,10 @@ const voyageSchema = new mongoose.Schema({
             type: Number,
             default: 0
         },
+        totalAmount: {
+            type: Number,
+            default: 0
+        },
         iceRequired: {
             type: Number,
             default: 0
@@ -87,7 +117,23 @@ const voyageSchema = new mongoose.Schema({
             type: Number,
             default: 0
         },
+        iceRate: {
+            type: Number,
+            default: 0
+        },
+        iceAmount: {
+            type: Number,
+            default: 0
+        },
         water: {
+            type: Number,
+            default: 0
+        },
+        waterRate: {
+            type: Number,
+            default: 0
+        },
+        waterAmount: {
             type: Number,
             default: 0
         },
@@ -136,14 +182,36 @@ const voyageSchema = new mongoose.Schema({
 
 // Virtual for voyageNo
 voyageSchema.virtual('voyageNo').get(function () {
-    return this._id.toString().substring(18).toUpperCase();
+    return `VOY-${this._id.toString().substring(18).toUpperCase()}`;
 });
 
-// Calculate fuelToCarry and iceToCarry before saving
+// Calculate fuelToCarry, amount, and iceToCarry before saving
 voyageSchema.pre('save', function () {
     if (this.supplies) {
-        this.supplies.fuelToCarry = Math.max(0, (this.supplies.fuelRequired || 0) - (this.supplies.fuelInTank || 0));
+        if (Array.isArray(this.supplies.fuelItems) && this.supplies.fuelItems.length > 0) {
+            let totalReq = 0;
+            let totalTank = 0;
+            let totalToCarry = 0;
+            let grandTotalAmount = 0;
+            this.supplies.fuelItems.forEach(item => {
+                item.fuelToCarry = Math.max(0, (item.fuelRequired || 0) - (item.fuelInTank || 0));
+                item.amount = item.fuelToCarry * (item.rate || 0);
+                totalReq += (item.fuelRequired || 0);
+                totalTank += (item.fuelInTank || 0);
+                totalToCarry += item.fuelToCarry;
+                grandTotalAmount += item.amount;
+            });
+            this.supplies.fuelRequired = totalReq;
+            this.supplies.fuelInTank = totalTank;
+            this.supplies.fuelToCarry = totalToCarry;
+            this.supplies.totalAmount = grandTotalAmount;
+            this.supplies.fuelType = this.supplies.fuelItems.map(i => i.fuelType).join(', ');
+        } else {
+            this.supplies.fuelToCarry = Math.max(0, (this.supplies.fuelRequired || 0) - (this.supplies.fuelInTank || 0));
+        }
         this.supplies.iceToCarry = Math.max(0, (this.supplies.iceRequired || 0) - (this.supplies.iceInStock || 0));
+        this.supplies.iceAmount = (this.supplies.iceToCarry || 0) * (this.supplies.iceRate || 0);
+        this.supplies.waterAmount = (this.supplies.water || 0) * (this.supplies.waterRate || 0);
     }
 });
 

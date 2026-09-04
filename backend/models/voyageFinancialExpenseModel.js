@@ -41,7 +41,6 @@ const voyageFinancialExpenseSchema = new mongoose.Schema({
 
 // Compound index to prevent duplicate standard expense records (e.g. Fuel) on the same voyage
 voyageFinancialExpenseSchema.index({ voyageId: 1, expenseName: 1 }, { unique: true });
-voyageFinancialExpenseSchema.index({ voyageId: 1 });
 
 const VoyageFinancialExpense = mongoose.model('VoyageFinancialExpense', voyageFinancialExpenseSchema, 'voyage_expenses');
 module.exports = VoyageFinancialExpense;

@@ -18,21 +18,21 @@ const boatSchema = new mongoose.Schema({
         ref: 'User',
         required: true
     },
-agentId: {
-         type: mongoose.Schema.Types.ObjectId,
-         ref: 'User',
-         required: false
-     },
-     locationId: {
-         type: mongoose.Schema.Types.ObjectId,
-         ref: 'Location',
-         required: false
-     },
-     subLocationId: {
-         type: mongoose.Schema.Types.ObjectId,
-         ref: 'SubLocation',
-         required: false
-     },
+    agentId: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'User',
+        required: false
+    },
+    locationId: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'Location',
+        required: false
+    },
+    subLocationId: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'SubLocation',
+        required: false
+    },
     registrationNumber: {
         type: String,
         trim: true
@@ -40,6 +40,23 @@ agentId: {
     capacity: {
         type: Number,
         min: 0
+    },
+    boatLength: {
+        type: String,
+        trim: true
+    },
+    engineDetails: {
+        type: String,
+        trim: true
+    },
+    boatImage: {
+        type: String,
+        trim: true
+    },
+    boatType: {
+        type: String,
+        trim: true,
+        default: 'Medium'
     },
     isActive: {
         type: Boolean,

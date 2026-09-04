@@ -9,6 +9,23 @@ const Crew = require('../models/crewModel');
 const { successResponse, errorResponse } = require('../utils/responseutils');
 const logger = require('../config/logger');
 
+const safeFormatDate = (date) => {
+    if (!date) return 'Draft Date';
+    const d = new Date(date);
+    if (isNaN(d.getTime())) return 'Draft Date';
+    return d.toLocaleDateString('en-IN', { day: '2-digit', month: 'short' });
+};
+
+const safeFormatVoyageNo = (voyage) => {
+    if (!voyage) return 'VOY-DRAFT';
+    if (voyage.voyageNo) {
+        const v = voyage.voyageNo.toString();
+        return v.startsWith('VOY-') ? v : `VOY-${v.replace(/^#/, '')}`;
+    }
+    const shortId = voyage._id ? voyage._id.toString().substring(18).toUpperCase() : 'DRAFT';
+    return `VOY-${shortId}`;
+};
+
 /**
  * Helper to compute P&L statistics for a list of voyages
  */
@@ -161,7 +178,7 @@ const getFinancialDashboard = async (req, res) => {
         });
         const topProfitVoyage = topProfitItem ? {
             id: topProfitItem.voyage._id,
-            voyageNo: `VOY-${topProfitItem.voyage.departureDate.getFullYear()}-${(topProfitItem.voyage.departureDate.getMonth() + 1).toString().padStart(2, '0')}-${topProfitItem.voyage.departureDate.getDate().toString().padStart(2, '0')}`,
+            voyageNo: safeFormatVoyageNo(topProfitItem.voyage),
             profit: topProfitItem.netProfit
         } : null;
 
@@ -197,13 +214,17 @@ const getFinancialDashboard = async (req, res) => {
 
         // 6. Recent Voyages (max 5)
         const recentPL = [...voyagesPL]
-            .sort((a, b) => b.voyage.departureDate - a.voyage.departureDate)
+            .sort((a, b) => {
+                const dA = a.voyage.departureDate ? new Date(a.voyage.departureDate).getTime() : 0;
+                const dB = b.voyage.departureDate ? new Date(b.voyage.departureDate).getTime() : 0;
+                return dB - dA;
+            })
             .slice(0, 5)
             .map(item => {
-                const dateStr = item.voyage.departureDate.toLocaleDateString('en-IN', { day: '2-digit', month: 'short' });
+                const dateStr = safeFormatDate(item.voyage.departureDate);
                 return {
                     id: item.voyage._id,
-                    voyageNo: `VOY-${item.voyage.departureDate.getFullYear()}-${(item.voyage.departureDate.getMonth() + 1).toString().padStart(2, '0')}-${item.voyage.departureDate.getDate().toString().padStart(2, '0')}`,
+                    voyageNo: safeFormatVoyageNo(item.voyage),
                     date: dateStr,
                     income: item.totalIncome,
                     expenses: item.totalExpenses,
@@ -250,11 +271,11 @@ const getVoyagesPLList = async (req, res) => {
         const voyagesPL = await computeVoyagesPL(voyages);
 
         const list = voyagesPL.map(item => {
-            const dateStr = item.voyage.departureDate.toLocaleDateString('en-IN', { day: '2-digit', month: 'short' });
-            const endStr = item.voyage.endDate ? item.voyage.endDate.toLocaleDateString('en-IN', { day: '2-digit', month: 'short' }) : 'Open';
+            const dateStr = safeFormatDate(item.voyage.departureDate);
+            const endStr = item.voyage.endDate ? safeFormatDate(item.voyage.endDate) : 'Open';
             return {
                 id: item.voyage._id,
-                voyageNo: `VOY-${item.voyage.departureDate.getFullYear()}-${(item.voyage.departureDate.getMonth() + 1).toString().padStart(2, '0')}-${item.voyage.departureDate.getDate().toString().padStart(2, '0')}`,
+                voyageNo: safeFormatVoyageNo(item.voyage),
                 boatName: item.voyage.boatId?.boatName || 'Unassigned Boat',
                 dateRange: `${dateStr} – ${endStr}`,
                 income: item.totalIncome,
@@ -325,17 +346,42 @@ const getVoyagePLSummary = async (req, res) => {
         });
 
         // Pre-populate standard items if they do not exist
+        const savedFuelExp = expensesMap['Fuel'];
+        const fuelQty = voyage.supplies?.fuelToCarry || 0;
+        const fuelTotalAmt = (voyage.supplies?.totalAmount > 0) 
+            ? voyage.supplies.totalAmount 
+            : (savedFuelExp ? savedFuelExp.amount : 0);
+        const fuelRate = savedFuelExp ? savedFuelExp.rate : (fuelQty > 0 ? (fuelTotalAmt / fuelQty) : 0);
+
+        const savedIceExp = expensesMap['Ice'];
+        const iceQty = voyage.supplies?.iceToCarry || 0;
+        const iceTotalAmt = (voyage.supplies?.iceAmount > 0)
+            ? voyage.supplies.iceAmount
+            : (savedIceExp ? savedIceExp.amount : 0);
+        const iceRate = (voyage.supplies?.iceRate > 0)
+            ? voyage.supplies.iceRate
+            : (savedIceExp ? savedIceExp.rate : (iceQty > 0 ? (iceTotalAmt / iceQty) : 0));
+
+        const savedWaterExp = expensesMap['Water'];
+        const waterQty = voyage.supplies?.water || 0;
+        const waterTotalAmt = (voyage.supplies?.waterAmount > 0)
+            ? voyage.supplies.waterAmount
+            : (savedWaterExp ? savedWaterExp.amount : 0);
+        const waterRate = (voyage.supplies?.waterRate > 0)
+            ? voyage.supplies.waterRate
+            : (savedWaterExp ? savedWaterExp.rate : (waterQty > 0 ? (waterTotalAmt / waterQty) : 0));
+
         const standardExpenses = [
-            { name: 'Fuel', qty: voyage.supplies?.fuelToCarry || 0, unit: 'Ltrs' },
-            { name: 'Ice', qty: voyage.supplies?.iceToCarry || 0, unit: 'Kgs' },
-            { name: 'Water', qty: voyage.supplies?.water || 0, unit: 'Ltrs' }
+            { name: 'Fuel', qty: fuelQty, unit: 'Ltrs', rate: fuelRate, amount: fuelTotalAmt },
+            { name: 'Ice', qty: iceQty, unit: 'Kgs', rate: iceRate, amount: iceTotalAmt },
+            { name: 'Water', qty: waterQty, unit: 'Ltrs', rate: waterRate, amount: waterTotalAmt }
         ];
 
         const expenseList = [];
         standardExpenses.forEach(item => {
             const savedExp = expensesMap[item.name];
-            const rate = savedExp ? savedExp.rate : 0;
-            const amount = item.qty * rate;
+            const rate = item.rate !== undefined ? item.rate : (savedExp ? savedExp.rate : 0);
+            const amount = item.amount !== undefined ? item.amount : (item.qty * rate);
             expenseList.push({
                 _id: savedExp ? savedExp._id : null,
                 expenseName: item.name,

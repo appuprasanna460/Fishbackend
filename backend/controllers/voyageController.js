@@ -4,6 +4,7 @@ const logger = require('../config/logger');
 
 const createVoyage = async (req, res) => {
     try {
+        console.log('=== CREATE VOYAGE REQ BODY STATUS ===', req.body.status);
         const voyage = await voyageService.createVoyage(req.body, req.user._id);
         
         // Also delete draft since voyage is created

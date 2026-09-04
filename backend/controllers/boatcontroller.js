@@ -264,3 +264,26 @@ exports.toggleBoatStatus = async (req, res, next) => {
         next(error);
     }
 };
+
+// ✅ Upload boat profile image to AWS S3
+exports.uploadBoatImage = async (req, res, next) => {
+    try {
+        if (!req.file) {
+            return errorResponse(res, 400, 'No image file provided');
+        }
+        const s3Service = require('../services/s3Service');
+        const uploadResult = await s3Service.uploadToS3(
+            req.file.buffer,
+            req.file.originalname,
+            req.file.mimetype,
+            'boats/profile-images'
+        );
+        return successResponse(res, 200, 'Boat image uploaded to AWS S3 successfully', {
+            imageUrl: uploadResult.url,
+            key: uploadResult.key
+        });
+    } catch (error) {
+        logger.error('Upload boat image error:', error);
+        next(error);
+    }
+};

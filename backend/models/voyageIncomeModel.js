@@ -42,7 +42,6 @@ const voyageIncomeSchema = new mongoose.Schema({
 
 // Compound unique index to ensure one rate record per species per voyage
 voyageIncomeSchema.index({ voyageId: 1, speciesName: 1 }, { unique: true });
-voyageIncomeSchema.index({ voyageId: 1 });
 
 const VoyageIncome = mongoose.model('VoyageIncome', voyageIncomeSchema, 'voyage_income');
 module.exports = VoyageIncome;

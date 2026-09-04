@@ -1,56 +1,80 @@
 const Joi = require('joi');
 
 const boatBaseSchema = {
-     boatNumber: Joi.string()
-         .required()
-         .trim()
-         .uppercase()
-         .pattern(/^[A-Z0-9-]+$/)
-         .messages({
-             'string.pattern.base': 'Boat number can only contain uppercase letters, numbers, and hyphens',
-             'any.required': 'Boat number is required'
-         }),
-     boatName: Joi.string()
-         .required()
-         .trim()
-         .min(2)
-         .max(100)
-         .messages({
-             'string.min': 'Boat name must be at least 2 characters long',
-             'string.max': 'Boat name cannot exceed 100 characters',
-             'any.required': 'Boat name is required'
-         }),
-     ownerId: Joi.string()
-         .pattern(/^[0-9a-fA-F]{24}$/)
-         .required()
-         .messages({
-             'string.pattern.base': 'Invalid owner ID format',
-             'any.required': 'Owner ID is required'
-         }),
-     agentId: Joi.string()
-         .pattern(/^[0-9a-fA-F]{24}$/)
-         .optional()
-         .allow(null, ''),
-     locationId: Joi.string()
-         .pattern(/^[0-9a-fA-F]{24}$/)
-         .optional()
-         .allow(null, ''),
-     subLocationId: Joi.string()
-         .pattern(/^[0-9a-fA-F]{24}$/)
-         .optional()
-         .allow(null, ''),
-     registrationNumber: Joi.string()
-         .trim()
-         .uppercase()
-         .max(50),
-     capacity: Joi.number()
-         .min(0)
-         .max(999999)
-         .messages({
-             'number.min': 'Capacity cannot be negative'
-         }),
-     isActive: Joi.boolean()
- };
+    boatNumber: Joi.string()
+        .required()
+        .trim()
+        .uppercase()
+        .pattern(/^[A-Z0-9-]+$/)
+        .messages({
+            'string.pattern.base': 'Boat number can only contain uppercase letters, numbers, and hyphens',
+            'any.required': 'Boat number is required'
+        }),
+    boatName: Joi.string()
+        .required()
+        .trim()
+        .min(2)
+        .max(100)
+        .messages({
+            'string.min': 'Boat name must be at least 2 characters long',
+            'string.max': 'Boat name cannot exceed 100 characters',
+            'any.required': 'Boat name is required'
+        }),
+    ownerId: Joi.string()
+        .pattern(/^[0-9a-fA-F]{24}$/)
+        .required()
+        .messages({
+            'string.pattern.base': 'Invalid owner ID format',
+            'any.required': 'Owner ID is required'
+        }),
+    agentId: Joi.string()
+        .pattern(/^[0-9a-fA-F]{24}$/)
+        .optional()
+        .allow(null, ''),
+    locationId: Joi.string()
+        .pattern(/^[0-9a-fA-F]{24}$/)
+        .optional()
+        .allow(null, ''),
+    subLocationId: Joi.string()
+        .pattern(/^[0-9a-fA-F]{24}$/)
+        .optional()
+        .allow(null, ''),
+    registrationNumber: Joi.string()
+        .trim()
+        .uppercase()
+        .max(50)
+        .optional()
+        .allow(null, ''),
+    capacity: Joi.number()
+        .min(0)
+        .max(999999)
+        .optional()
+        .allow(null, '')
+        .messages({
+            'number.min': 'Capacity cannot be negative'
+        }),
+    boatLength: Joi.string()
+        .trim()
+        .optional()
+        .allow(null, ''),
+    engineDetails: Joi.string()
+        .trim()
+        .optional()
+        .allow(null, ''),
+    boatImage: Joi.string()
+        .trim()
+        .optional()
+        .allow(null, ''),
+    boatType: Joi.string()
+        .trim()
+        .optional()
+        .allow(null, ''),
+    ownerName: Joi.string()
+        .trim()
+        .optional()
+        .allow(null, ''),
+    isActive: Joi.boolean().optional()
+};
 
 // Create boat schema
 const createBoatSchema = Joi.object(boatBaseSchema);
