@@ -348,6 +348,12 @@ class VoyageService {
         const allCrew = [voyage.captainId, ...voyage.crewMembers];
 
         if (status === 'ACTIVE') {
+            if (voyage.tokenStatus && voyage.tokenStatus !== 'APPROVED') {
+                throw new Error('Cannot start voyage. Harbor token approval is in progress or not requested.');
+            }
+            if (voyage.tokenStatus === 'APPROVED' && !voyage.tokenViewed) {
+                throw new Error('Cannot start voyage. Please view the generated harbor token image first.');
+            }
             voyage.startedAt = new Date();
             // Lock crew
             await Crew.updateMany(
@@ -475,6 +481,64 @@ class VoyageService {
             .populate('captainId', 'name phone')
             .sort({ departureDate: -1 })
             .lean();
+    }
+
+    // ── Token Management Methods ─────────────────────────────────────────────
+
+    async requestVoyageToken(id, ownerId) {
+        const voyage = await Voyage.findOne({ _id: id, ownerId, isDeleted: false });
+        if (!voyage) {
+            throw new Error('Voyage not found or access denied');
+        }
+        voyage.tokenStatus = 'IN_PROGRESS';
+        voyage.tokenRequestedAt = new Date();
+        await voyage.save();
+        return voyage;
+    }
+
+    async markVoyageTokenViewed(id, ownerId) {
+        const voyage = await Voyage.findOne({ _id: id, ownerId, isDeleted: false });
+        if (!voyage) {
+            throw new Error('Voyage not found or access denied');
+        }
+        voyage.tokenViewed = true;
+        await voyage.save();
+        return voyage;
+    }
+
+    async getAdminVoyageTokens(statusFilter) {
+        const query = { isDeleted: false };
+        if (statusFilter) {
+            query.tokenStatus = statusFilter;
+        } else {
+            query.tokenStatus = { $in: ['IN_PROGRESS', 'APPROVED'] };
+        }
+
+        return await Voyage.find(query)
+            .populate({
+                path: 'boatId',
+                select: 'boatName boatNumber registrationNumber boatType imageUrl length breadth draft capacity engineType yearBuilt harbourId'
+            })
+            .populate('ownerId', 'name email phone companyName')
+            .populate('captainId', 'name phone role experienceYears')
+            .populate('crewMembers', 'name phone role')
+            .populate('departureHarbour', 'name code state district')
+            .sort({ tokenRequestedAt: -1, createdAt: -1 })
+            .lean();
+    }
+
+    async approveVoyageToken(id, tokenImage, tokenNotes) {
+        const voyage = await Voyage.findById(id);
+        if (!voyage) {
+            throw new Error('Voyage not found');
+        }
+        voyage.tokenStatus = 'APPROVED';
+        voyage.tokenImage = tokenImage;
+        voyage.tokenNotes = tokenNotes || '';
+        voyage.tokenApprovedAt = new Date();
+        voyage.tokenViewed = false; // Owner must tap to view after approval
+        await voyage.save();
+        return voyage;
     }
 }
 

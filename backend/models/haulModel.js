@@ -22,18 +22,21 @@ const haulSchema = new mongoose.Schema({
     },
     fishingGround: {
         type: String,
-        required: true,
-        trim: true
+        required: false,
+        trim: true,
+        default: 'General'
     },
     gearType: {
         type: String,
-        required: true,
-        trim: true
+        required: false,
+        trim: true,
+        default: 'Standard'
     },
     netLength: {
         type: Number,
-        required: true,
-        min: 1
+        required: false,
+        min: 0,
+        default: 0
     },
     startLocation: {
         latitude: {

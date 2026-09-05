@@ -166,13 +166,34 @@ const voyageSchema = new mongoose.Schema({
         type: Date,
         default: null
     },
-    cancelledAt: {
-        type: Date,
-        default: null
-    },
     isDeleted: {
         type: Boolean,
         default: false
+    },
+    tokenStatus: {
+        type: String,
+        enum: ['NONE', 'IN_PROGRESS', 'APPROVED'],
+        default: 'NONE'
+    },
+    tokenImage: {
+        type: String,
+        default: ''
+    },
+    tokenNotes: {
+        type: String,
+        default: ''
+    },
+    tokenViewed: {
+        type: Boolean,
+        default: false
+    },
+    tokenRequestedAt: {
+        type: Date,
+        default: null
+    },
+    tokenApprovedAt: {
+        type: Date,
+        default: null
     }
 }, {
     timestamps: true,

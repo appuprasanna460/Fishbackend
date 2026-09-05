@@ -34,9 +34,9 @@ class HaulService {
             boatId: voyage.boatId,
             ownerId,
             haulNumber,
-            fishingGround,
-            gearType,
-            netLength,
+            fishingGround: fishingGround || 'General',
+            gearType: gearType || 'Standard',
+            netLength: netLength || 0,
             startLocation,
             gpsTrack: [{
                 latitude: startLocation.latitude,
@@ -50,12 +50,14 @@ class HaulService {
 
         await haul.save();
 
-        // Update fishing ground statistics
-        try {
-            await fishingGroundService.incrementUsage(ownerId, fishingGround);
-        } catch (error) {
-            console.error('Failed to update fishing ground usage:', error);
-            // Non-blocking error
+        // Update fishing ground statistics if ground provided
+        if (fishingGround) {
+            try {
+                await fishingGroundService.incrementUsage(ownerId, fishingGround);
+            } catch (error) {
+                console.error('Failed to update fishing ground usage:', error);
+                // Non-blocking error
+            }
         }
 
         return haul;

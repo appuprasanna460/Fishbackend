@@ -265,6 +265,8 @@ router.get('/voyages/stats', voyageController.getVoyageStats);
 router.get('/voyages/:id', validate(idParamSchema, 'params'), voyageController.getVoyageById);
 router.put('/voyages/:id', validate(idParamSchema, 'params'), validate(updateVoyageSchema), voyageController.updateVoyage);
 router.put('/voyages/:id/status', validate(idParamSchema, 'params'), validate(updateVoyageStatusSchema), voyageController.updateVoyageStatus);
+router.post('/voyages/:id/request-token', validate(idParamSchema, 'params'), voyageController.requestVoyageToken);
+router.post('/voyages/:id/view-token', validate(idParamSchema, 'params'), voyageController.markVoyageTokenViewed);
 router.delete('/voyages/:id', validate(idParamSchema, 'params'), voyageController.deleteVoyage);
 
 // ─── Catch Summary (voyage-level) ─────────────────────────────────────────────

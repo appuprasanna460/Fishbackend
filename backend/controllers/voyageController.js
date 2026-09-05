@@ -155,6 +155,70 @@ const getVoyagesByBoat = async (req, res) => {
     }
 };
 
+const requestVoyageToken = async (req, res) => {
+    try {
+        const voyage = await voyageService.requestVoyageToken(req.params.id, req.user._id);
+        successResponse(res, 200, 'Harbor token requested successfully', voyage);
+    } catch (error) {
+        logger.error('Request voyage token error:', error);
+        errorResponse(res, 400, error.message || 'Failed to request voyage token');
+    }
+};
+
+const markVoyageTokenViewed = async (req, res) => {
+    try {
+        const voyage = await voyageService.markVoyageTokenViewed(req.params.id, req.user._id);
+        successResponse(res, 200, 'Voyage token marked as viewed', voyage);
+    } catch (error) {
+        logger.error('Mark voyage token viewed error:', error);
+        errorResponse(res, 400, error.message || 'Failed to mark voyage token viewed');
+    }
+};
+
+const getAdminVoyageTokens = async (req, res) => {
+    try {
+        const { status } = req.query;
+        const tokens = await voyageService.getAdminVoyageTokens(status);
+        successResponse(res, 200, 'Admin voyage token requests retrieved successfully', tokens);
+    } catch (error) {
+        logger.error('Get admin voyage tokens error:', error);
+        errorResponse(res, 500, error.message || 'Failed to retrieve voyage tokens');
+    }
+};
+
+const approveVoyageToken = async (req, res) => {
+    try {
+        const { tokenNotes } = req.body;
+        let tokenImage = req.body.tokenImage || '';
+
+        if (req.file) {
+            try {
+                const s3Service = require('../services/s3Service');
+                const uploadResult = await s3Service.uploadToS3(
+                    req.file.buffer,
+                    req.file.originalname,
+                    req.file.mimetype,
+                    'voyage-tokens'
+                );
+                tokenImage = uploadResult.url;
+            } catch (err) {
+                logger.error('S3 upload error during token approval:', err);
+                tokenImage = `/uploads/${req.file.originalname}`;
+            }
+        }
+
+        if (!tokenImage) {
+            return errorResponse(res, 400, 'Token clearance pass image is required for approval');
+        }
+
+        const voyage = await voyageService.approveVoyageToken(req.params.id, tokenImage, tokenNotes);
+        successResponse(res, 200, 'Voyage token approved successfully', voyage);
+    } catch (error) {
+        logger.error('Approve voyage token error:', error);
+        errorResponse(res, 400, error.message || 'Failed to approve voyage token');
+    }
+};
+
 module.exports = {
     createVoyage,
     getVoyages,
@@ -167,5 +231,9 @@ module.exports = {
     getVoyagesByBoat,
     saveDraft,
     getDraft,
-    deleteDraft
+    deleteDraft,
+    requestVoyageToken,
+    markVoyageTokenViewed,
+    getAdminVoyageTokens,
+    approveVoyageToken
 };
