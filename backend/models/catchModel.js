@@ -23,19 +23,20 @@ const catchSchema = new mongoose.Schema({
     },
     weight: {
         type: Number,
-        required: true,
-        min: 0.1
+        default: 0
     },
     boxes: {
         type: Number,
-        required: true,
-        min: 1
+        default: 0
     },
-    sharePercentage: {
+    type: {
+        type: String,
+        enum: ['kg', 'unit', 'box', 'net'],
+        default: 'kg'
+    },
+    quantity: {
         type: Number,
-        default: 0,
-        min: 0,
-        max: 100
+        default: 0
     },
     rate: {
         type: Number,

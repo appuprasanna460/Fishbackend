@@ -7,7 +7,10 @@ const VoyageIncome = require('../models/voyageIncomeModel');
 class CatchService {
     // Create a new catch
     async createCatch(data, userId) {
-        const { haulId, voyageId, species, weight, boxes, rate, sharePercentage } = data;
+        const { haulId, voyageId, species, weight, boxes, type, quantity, rate } = data;
+        const resolvedQty = Number(quantity !== undefined ? quantity : (weight || 0));
+        const resolvedWeight = Number(weight !== undefined ? weight : resolvedQty);
+        const resolvedBoxes = Number(boxes !== undefined ? boxes : (type === 'box' ? resolvedQty : 1));
 
         if (haulId) {
             // Verify the haul exists
@@ -21,11 +24,12 @@ class CatchService {
                 voyageId: haul.voyageId,
                 ownerId: haul.ownerId,
                 species,
-                weight,
-                boxes,
-                sharePercentage,
+                weight: resolvedWeight,
+                boxes: resolvedBoxes,
+                type: type || 'kg',
+                quantity: resolvedQty,
                 rate: rate || 0,
-                amount: (weight || 0) * (rate || 0)
+                amount: resolvedWeight * (rate || 0)
             });
 
             await newCatch.save();
@@ -131,7 +135,7 @@ class CatchService {
             throw new Error('Catch not found');
         }
 
-        const { species, weight, boxes, sharePercentage, rate } = data;
+        const { species, weight, boxes, type, quantity, rate } = data;
 
         // Calculate weight difference for fishing ground update
         const weightDiff = (weight !== undefined ? weight : singleCatch.weight) - singleCatch.weight;
@@ -139,7 +143,8 @@ class CatchService {
         if (species !== undefined) singleCatch.species = species;
         if (weight !== undefined) singleCatch.weight = weight;
         if (boxes !== undefined) singleCatch.boxes = boxes;
-        if (sharePercentage !== undefined) singleCatch.sharePercentage = sharePercentage;
+        if (type !== undefined) singleCatch.type = type;
+        if (quantity !== undefined) singleCatch.quantity = quantity;
         if (rate !== undefined) {
             singleCatch.rate = rate;
             singleCatch.amount = (weight !== undefined ? weight : singleCatch.weight) * rate;

@@ -93,34 +93,53 @@ const getFinancialDashboard = async (req, res) => {
         const ownerId = req.user._id;
         const { period, startDate, endDate } = req.query;
 
-        // Determine date range
-        let start = new Date();
-        let end = new Date();
-        const now = new Date();
+        let voyages = [];
 
-        if (period === 'This Year') {
-            start = new Date(now.getFullYear(), 0, 1);
-            end = new Date(now.getFullYear(), 11, 31, 23, 59, 59);
-        } else if (period === 'Custom' && startDate && endDate) {
-            start = new Date(startDate);
-            end = new Date(endDate);
-            end.setHours(23, 59, 59, 999);
+        if (period === 'Last 7 voyages') {
+            voyages = await Voyage.find({
+                ownerId,
+                isDeleted: false
+            }).sort({ departureDate: -1, createdAt: -1 }).limit(7).populate('boatId', 'boatName boatNumber');
+            voyages.reverse();
+        } else if (period === 'Recent 10 voyages' || period === 'Last 10 voyages') {
+            voyages = await Voyage.find({
+                ownerId,
+                isDeleted: false
+            }).sort({ departureDate: -1, createdAt: -1 }).limit(10).populate('boatId', 'boatName boatNumber');
+            voyages.reverse();
+        } else if (period === 'ALL voyages' || period === 'ALL') {
+            voyages = await Voyage.find({
+                ownerId,
+                isDeleted: false
+            }).sort({ departureDate: 1, createdAt: 1 }).populate('boatId', 'boatName boatNumber');
         } else {
-            // Default to 'This Month'
-            start = new Date(now.getFullYear(), now.getMonth(), 1);
-            end = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59);
-        }
+            let start = new Date();
+            let end = new Date();
+            const now = new Date();
 
-        // Fetch matching voyages
-        const voyages = await Voyage.find({
-            ownerId,
-            departureDate: { $gte: start, $lte: end },
-            isDeleted: false
-        }).populate('boatId', 'boatName boatNumber');
+            if (period === 'This Year') {
+                start = new Date(now.getFullYear(), 0, 1);
+                end = new Date(now.getFullYear(), 11, 31, 23, 59, 59);
+            } else if (period === 'Custom' && startDate && endDate) {
+                start = new Date(startDate);
+                end = new Date(endDate);
+                end.setHours(23, 59, 59, 999);
+            } else {
+                // Default to 'This Month'
+                start = new Date(now.getFullYear(), now.getMonth(), 1);
+                end = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59);
+            }
+
+            voyages = await Voyage.find({
+                ownerId,
+                departureDate: { $gte: start, $lte: end },
+                isDeleted: false
+            }).sort({ departureDate: 1 }).populate('boatId', 'boatName boatNumber');
+        }
 
         if (voyages.length === 0) {
             return successResponse(res, 200, 'No financial records in selected date range', {
-                summary: { totalIncome: 0, totalExpenses: 0, netProfit: 0, profitMargin: 0 },
+                summary: { totalIncome: 0, totalExpenses: 0, netProfit: 0, profitMargin: 0, totalCrewSettlement: 0, totalCrewPaid: 0 },
                 voyageStats: { total: 0, completed: 0, active: 0, cancelled: 0 },
                 chartData: [],
                 topProfitVoyage: null,
@@ -158,9 +177,13 @@ const getFinancialDashboard = async (req, res) => {
 
         // 3. Chart Data (Dynamic Aggregation by Date)
         // Sort voyages by date to keep chart chronologically ordered
-        const sortedPL = [...voyagesPL].sort((a, b) => a.voyage.departureDate - b.voyage.departureDate);
+        const sortedPL = [...voyagesPL].sort((a, b) => {
+            const dA = a.voyage.departureDate ? new Date(a.voyage.departureDate).getTime() : 0;
+            const dB = b.voyage.departureDate ? new Date(b.voyage.departureDate).getTime() : 0;
+            return dA - dB;
+        });
         const chartData = sortedPL.map(item => {
-            const dateStr = item.voyage.departureDate.toLocaleDateString('en-IN', { day: '2-digit', month: 'short' });
+            const dateStr = safeFormatDate(item.voyage.departureDate);
             return {
                 date: dateStr,
                 income: item.totalIncome,
@@ -233,12 +256,25 @@ const getFinancialDashboard = async (req, res) => {
                 };
             });
 
+        // Fetch all crew settlements to compute total crew settlement & total crew paid
+        const allCrewSettlements = await VoyageCrewSettlement.find({ voyageId: { $in: voyageIds } });
+        let totalCrewSettlement = 0;
+        let totalCrewPaid = 0;
+        allCrewSettlements.forEach(item => {
+            const adv = item.advance || item.amount || 0;
+            const paidAmt = item.paidAmount !== undefined && item.paidAmount > 0 ? item.paidAmount : (item.paid ? adv : 0);
+            totalCrewSettlement += adv;
+            totalCrewPaid += paidAmt;
+        });
+
         return successResponse(res, 200, 'Financial dashboard data retrieved successfully', {
             summary: {
                 totalIncome,
                 totalExpenses,
                 netProfit,
-                profitMargin
+                profitMargin,
+                totalCrewSettlement,
+                totalCrewPaid
             },
             voyageStats: {
                 total: voyages.length,
