@@ -95,13 +95,7 @@ const getFinancialDashboard = async (req, res) => {
 
         let voyages = [];
 
-        if (period === 'Last 7 voyages') {
-            voyages = await Voyage.find({
-                ownerId,
-                isDeleted: false
-            }).sort({ departureDate: -1, createdAt: -1 }).limit(7).populate('boatId', 'boatName boatNumber');
-            voyages.reverse();
-        } else if (period === 'Recent 10 voyages' || period === 'Last 10 voyages') {
+        if (period === 'Recent 10 voyages' || period === 'Last 10 voyages') {
             voyages = await Voyage.find({
                 ownerId,
                 isDeleted: false
@@ -120,6 +114,12 @@ const getFinancialDashboard = async (req, res) => {
             if (period === 'This Year') {
                 start = new Date(now.getFullYear(), 0, 1);
                 end = new Date(now.getFullYear(), 11, 31, 23, 59, 59);
+            } else if (period === 'Last 7 Days' || period === 'Last 7 days' || period === 'Last 7 voyages') {
+                start = new Date(now);
+                start.setDate(now.getDate() - 7);
+                start.setHours(0, 0, 0, 0);
+                end = new Date(now);
+                end.setHours(23, 59, 59, 999);
             } else if (period === 'Custom' && startDate && endDate) {
                 start = new Date(startDate);
                 end = new Date(endDate);
