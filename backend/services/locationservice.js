@@ -41,7 +41,7 @@ class LocationService {
         const query = { isDeleted: false };
 
         if (filters.isActive !== undefined) {
-            query.isActive = filters.isActive;
+            query.isActive = String(filters.isActive) === 'true';
         }
 
         const locations = await Location.find(query)
@@ -162,7 +162,7 @@ class LocationService {
         }
 
         // Check if location is used in any boat
-        const Boat = require('../models/boat.model');
+        const Boat = require('../models/boatmodel');
         const boatCount = await Boat.countDocuments({
             locationId: locationId,
             isDeleted: false
@@ -276,7 +276,7 @@ class LocationService {
         }
 
         // Check if sub-location is used in any boat
-        const Boat = require('../models/boat.model');
+        const Boat = require('../models/boatmodel');
         const boatCount = await Boat.countDocuments({
             subLocationId: subLocationId,
             isDeleted: false
@@ -305,7 +305,7 @@ class LocationService {
         };
 
         if (filters.isActive !== undefined) {
-            query.isActive = filters.isActive;
+            query.isActive = String(filters.isActive) === 'true';
         }
 
         return SubLocation.find(query)

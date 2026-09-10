@@ -6,7 +6,7 @@ const voyageSchema = new mongoose.Schema({
     boatId: {
         type: mongoose.Schema.Types.ObjectId,
         ref: 'Boat',
-        required: notDraft
+        required: function() { return this.status !== 'DRAFT'; }
     },
     ownerId: {
         type: mongoose.Schema.Types.ObjectId,
@@ -16,7 +16,7 @@ const voyageSchema = new mongoose.Schema({
     captainId: {
         type: mongoose.Schema.Types.ObjectId,
         ref: 'Crew',
-        required: notDraft
+        required: function() { return this.status !== 'DRAFT'; }
     },
     crewMembers: [{
         type: mongoose.Schema.Types.ObjectId,
@@ -25,28 +25,28 @@ const voyageSchema = new mongoose.Schema({
     departureHarbour: {
         type: mongoose.Schema.Types.ObjectId,
         ref: 'Harbour',
-        required: notDraft
+        required: function() { return this.status !== 'DRAFT'; }
     },
     departureDate: {
         type: Date,
-        required: notDraft
+        required: function() { return this.status !== 'DRAFT'; }
     },
     departureTime: {
         type: String,
-        required: notDraft
+        required: function() { return this.status !== 'DRAFT'; }
     },
     endDate: {
         type: Date,
-        required: notDraft
+        required: function() { return this.status !== 'DRAFT'; }
     },
     voyageType: {
         type: String,
-        required: notDraft,
+        required: function() { return this.status !== 'DRAFT'; },
         enum: ['DEEP_SEA', 'UNDERDEEP']
     },
     expectedDuration: {
         type: String,
-        required: notDraft,
+        required: function() { return this.status !== 'DRAFT'; },
         enum: ['5-7_DAYS', '8-9_DAYS']
     },
     targetSpecies: [{

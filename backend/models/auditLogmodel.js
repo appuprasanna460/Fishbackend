@@ -6,6 +6,11 @@ const auditLogSchema = new mongoose.Schema({
         ref: 'User',
         required: true
     },
+    exporterId: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'User',
+        index: true
+    },
     action: {
         type: String,
         required: true,

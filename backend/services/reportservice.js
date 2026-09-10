@@ -611,7 +611,7 @@ class ReportService {
         await this.applyRoleFilter(query, user);
 
         if (user.role === 'BOAT_OWNER') {
-            const Boat = require('../models/boat.model');
+            const Boat = require('../models/boatmodel');
             const boats = await Boat.find({ ownerId: user._id, isDeleted: false }).select('_id');
             query.boatId = { $in: boats.map(b => b._id) };
         }
@@ -711,7 +711,7 @@ class ReportService {
 
         // Add additional filters for boat owner
         if (user.role === 'BOAT_OWNER') {
-            const Boat = require('../models/boat.model');
+            const Boat = require('../models/boatmodel');
             const boats = await Boat.find({
                 ownerId: user._id,
                 isDeleted: false

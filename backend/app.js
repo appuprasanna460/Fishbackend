@@ -11,7 +11,6 @@ const { auditLog } = require('./middleware/auditLogmiddleware');
 const bookingRoutes = require('./routes/bookingroutes');
 const boatOwnerRoutes = require('./routes/boatownerroutes');
 
-
 // Import routes
 const authRoutes = require('./routes/authroutes');
 const fishBuyerBillRoutes = require('./routes/fishBuyerBillRoutes');
@@ -35,11 +34,18 @@ const voyageRoutes = require('./routes/voyageRoutes');
 const catchRoutes = require('./routes/catchRoutes');
 const agentDashboardRoutes = require('./routes/agentDashboardRoutes');
 
-
-// Helper to wrap async handlers for Express 5
-const asyncHandler = (fn) => (req, res, next) => {
-    Promise.resolve(fn(req, res, next)).catch(next);
-};
+// Exporter Module routes
+const purchaseRoutes = require('./routes/purchaseRoutes');
+const stockRoutes = require('./routes/stockRoutes');
+const salesRoutes = require('./routes/salesRoutes');
+const dispatchRoutes = require('./routes/dispatchRoutes');
+const financeRoutes = require('./routes/financeRoutes');
+const marketIntelRoutes = require('./routes/marketIntelRoutes');
+const exporterStaffRoutes = require('./routes/exporterStaffRoutes');
+const exporterDashboardRoutes = require('./routes/exporterDashboardRoutes');
+const exporterReportRoutes = require('./routes/exporterReportRoutes');
+const exporterMasterRoutes = require('./routes/exporterMasterRoutes');
+const exporterCustomerRoutes = require('./routes/exporterCustomerRoutes');
 
 const app = express();
 
@@ -47,7 +53,7 @@ const app = express();
 app.use(cors({
     origin: '*', // Allow all origins for development - restrict in production
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
-    allowedHeaders: ['Content-Type', 'Authorization', 'Accept'],
+    allowedHeaders: ['Content-Type', 'Authorization', 'Accept', 'Idempotency-Key', 'X-Idempotency-Key'],
     credentials: true
 }));
 
@@ -65,7 +71,7 @@ app.get('/health', (req, res) => {
     });
 });
 
-// API routes
+// General API routes
 app.use('/api/auth', authRoutes);
 app.use('/api/users', userRoutes);
 app.use('/api/locations', locationRoutes);
@@ -89,6 +95,31 @@ app.use('/api/staff', staffRoutes);
 app.use('/api/voyages', voyageRoutes);
 app.use('/api/catches', catchRoutes);
 app.use('/api/agent', agentDashboardRoutes);
+
+// Dedicated Exporter Module Routes (/api/exporter/*)
+app.use('/api/exporter/dashboard', exporterDashboardRoutes);
+app.use('/api/exporter/reports', exporterReportRoutes);
+app.use('/api/exporter/masters', exporterMasterRoutes);
+app.use('/api/exporter/customers', exporterCustomerRoutes);
+app.use('/api/exporter/staff', exporterStaffRoutes);
+app.use('/api/exporter/purchases', purchaseRoutes);
+app.use('/api/exporter/stock', stockRoutes);
+app.use('/api/exporter/sales', salesRoutes);
+app.use('/api/exporter/dispatch', dispatchRoutes);
+app.use('/api/exporter/finance', financeRoutes);
+app.use('/api/exporter/market-intelligence', marketIntelRoutes);
+
+// Root Exporter routes (backward compatibility)
+app.use('/api/purchases', purchaseRoutes);
+app.use('/api/stock', stockRoutes);
+app.use('/api/sales', salesRoutes);
+app.use('/api/dispatch', dispatchRoutes);
+app.use('/api/finance', financeRoutes);
+app.use('/api/receivables', financeRoutes);
+app.use('/api/payables', financeRoutes);
+app.use('/api/expenses', financeRoutes);
+app.use('/api/market-intelligence', marketIntelRoutes);
+app.use('/api/exporter-staff', exporterStaffRoutes);
 
 // Audit logging for all API routes
 app.use('/api', auditLog);

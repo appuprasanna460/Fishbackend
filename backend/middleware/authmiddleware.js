@@ -151,6 +151,5 @@ const optionalAuth = async (req, res, next) => {
 
 module.exports = {
     authenticate,
-    optionalAuth,
-    authorize
+    optionalAuth
 };

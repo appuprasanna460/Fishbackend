@@ -38,10 +38,6 @@ const boatCoordinateSchema = new mongoose.Schema({
 
 // Indexes
 boatCoordinateSchema.index({ boatId: 1, recordedAt: -1 });
-boatCoordinateSchema.index({ boatId: 1, recordedAt: -1 }, {
-    unique: true,
-    partialFilterExpression: { recordedAt: { $exists: true } }
-});
 
 // TTL index to auto-delete old coordinates (after 30 days)
 boatCoordinateSchema.index({ recordedAt: 1 }, { expireAfterSeconds: 2592000 });

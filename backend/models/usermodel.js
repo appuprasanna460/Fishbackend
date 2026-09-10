@@ -30,10 +30,74 @@ const userSchema = new mongoose.Schema({
     },
     role: {
         type: String,
-        enum: ['SUPER_ADMIN', 'COMMISSION_AGENT', 'STAFF', 'FISH_BUYER', 'BOAT_OWNER', 'CAPTAIN', 'CREW', 'MECHANIC', 'ACCOUNTANT'],
+        enum: [
+            'SUPER_ADMIN', 
+            'DOMESTIC_EXPORTER', 
+            'PURCHASE_STAFF', 
+            'WAREHOUSE_STAFF', 
+            'SALES_STAFF', 
+            'ACCOUNTANT', 
+            'BOAT_OWNER', 
+            'COMMISSION_AGENT', 
+            'SUPPLIER', 
+            'BUYER', 
+            'STAFF', 
+            'FISH_BUYER', 
+            'CAPTAIN', 
+            'CREW', 
+            'MECHANIC'
+        ],
         required: true,
         default: 'FISH_BUYER'
     },
+    exporterId: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'Exporter'
+    },
+    assignedHarbourId: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'Harbour'
+    },
+    department: {
+        type: String,
+        enum: ['PURCHASE', 'WAREHOUSE', 'SALES', 'FINANCE', 'ADMIN']
+    },
+    managerId: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'User'
+    },
+    businessName: {
+        type: String,
+        trim: true
+    },
+    gstNumber: {
+        type: String,
+        trim: true
+    },
+    panNumber: {
+        type: String,
+        trim: true
+    },
+    sellerType: {
+        type: String,
+        enum: ['BOAT_OWNER', 'COMMISSION_AGENT', 'SUPPLIER']
+    },
+    commissionRate: {
+        type: Number,
+        default: 0
+    },
+    creditLimit: {
+        type: Number,
+        default: 0
+    },
+    paymentTerms: {
+        type: String,
+        enum: ['CASH', 'CREDIT_7', 'CREDIT_15', 'CREDIT_30', 'CREDIT_45']
+    },
+    permissions: [{
+        module: String,
+        access: String
+    }],
     locationId: {
         type: String,
         trim: true
@@ -271,6 +335,9 @@ userSchema.index({ locationId: 1 });
 userSchema.index({ isActive: 1, isDeleted: 1 });
 userSchema.index({ agentId: 1, role: 1 });
 userSchema.index({ agentId: 1, isActive: 1 });
+userSchema.index({ exporterId: 1, role: 1 });
+userSchema.index({ exporterId: 1 });
+userSchema.index({ ownerId: 1 });
 
 // ✅ FIXED: Pre-save middleware without 'next'
 userSchema.pre('save', async function () {

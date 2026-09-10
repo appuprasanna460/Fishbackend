@@ -60,7 +60,7 @@ bookingSchema.index({ isDeleted: 1 });
 bookingSchema.index({ status: 1 });
 bookingSchema.index({ agentId: 1, status: 1 });
 
-// ✅ Pre-save middleware to generate booking number
+// ✅ Pre-save middleware to generate booking number atomically
 bookingSchema.pre('save', async function () {
     if (this.isNew && !this.bookingNumber) {
         try {
@@ -68,12 +68,19 @@ bookingSchema.pre('save', async function () {
             const year = date.getFullYear();
             const month = String(date.getMonth() + 1).padStart(2, '0');
             const day = String(date.getDate()).padStart(2, '0');
+            const datePrefix = `${year}${month}${day}`;
 
-            const count = await this.constructor.countDocuments({ isDeleted: false });
-            const sequence = String(count + 1).padStart(4, '0');
+            const result = await mongoose.connection.collection('counters').findOneAndUpdate(
+                { _id: `booking_${datePrefix}` },
+                { $inc: { seq: 1 } },
+                { upsert: true, returnDocument: 'after' }
+            );
 
-            this.bookingNumber = `BK${year}${month}${day}${sequence}`;
-            console.log(`✅ Generated booking number: ${this.bookingNumber}`);
+            const seq = result.value ? result.value.seq : (result.seq || 1);
+            const sequence = String(seq).padStart(4, '0');
+
+            this.bookingNumber = `BK${datePrefix}${sequence}`;
+            console.log(`✅ Generated atomic booking number: ${this.bookingNumber}`);
         } catch (error) {
             console.error('❌ Error generating booking number:', error);
             this.bookingNumber = `BK${Date.now()}`;

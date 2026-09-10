@@ -104,8 +104,8 @@ const registerSchema = Joi.object({
         'any.required': 'Company name is required'
     }),
     referenceBy: Joi.string().trim().allow('').optional(),
-    role: Joi.string().valid('COMMISSION_AGENT', 'BOAT_OWNER', 'FISH_BUYER').required().messages({
-        'any.only': 'Role must be one of: COMMISSION_AGENT, BOAT_OWNER, FISH_BUYER',
+    role: Joi.string().valid('COMMISSION_AGENT', 'BOAT_OWNER', 'FISH_BUYER', 'DOMESTIC_EXPORTER').required().messages({
+        'any.only': 'Role must be one of: COMMISSION_AGENT, BOAT_OWNER, FISH_BUYER, DOMESTIC_EXPORTER',
         'any.required': 'Role is required'
     }),
     harbourId: Joi.string().hex().length(24).required().messages({

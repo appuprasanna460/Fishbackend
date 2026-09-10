@@ -182,6 +182,11 @@ class SubscriptionService {
         user.isApproved = true;
         await user.save();
 
+        if (user.role === 'DOMESTIC_EXPORTER') {
+            const exporterProvisioningService = require('./exporterProvisioningService');
+            await exporterProvisioningService.provisionExporter(user._id);
+        }
+
         // Mark request approved
         request.status = 'APPROVED';
         request.approvedAt = now;

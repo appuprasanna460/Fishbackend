@@ -54,7 +54,7 @@ const fishSchema = new mongoose.Schema({
 // ✅ Update unique index to handle null agentId
 fishSchema.index({ name: 1, agentId: 1 }, {
     unique: true,
-    sparse: true  // ✅ Allows null values
+    partialFilterExpression: { agentId: { $exists: true } }
 });
 fishSchema.index({ agentId: 1 });
 fishSchema.index({ category: 1 });

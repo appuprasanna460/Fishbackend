@@ -138,6 +138,11 @@ exports.approveRegistration = async (req, res) => {
         user.subscriptionApprovedAt = now;
         await user.save();
 
+        if (user.role === 'DOMESTIC_EXPORTER') {
+            const exporterProvisioningService = require('../services/exporterProvisioningService');
+            await exporterProvisioningService.provisionExporter(user._id);
+        }
+
         notification.isActioned = true;
         notification.isRead = true;
         await notification.save();

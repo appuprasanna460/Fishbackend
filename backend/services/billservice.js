@@ -295,7 +295,6 @@ class BillService {
                 }
             }
         } else if (user.role === 'BOAT_OWNER') {
-            const Boat = require('../models/boatmodel');
             const ownerBoats = await Boat.find({ ownerId: user._id, isDeleted: false }).select('_id').lean();
             const boatIds = ownerBoats.map(b => b._id);
             query.boatId = { $in: boatIds };
@@ -559,7 +558,6 @@ class BillService {
             if (boatOwnerId === userIdStr) {
                 hasAccess = true;
             } else {
-                const Boat = require('../models/boatmodel');
                 const boat = await Boat.findById(getObjectIdStr(bill.boatId)).lean();
                 if (boat && boat.ownerId.toString() === userIdStr) {
                     hasAccess = true;

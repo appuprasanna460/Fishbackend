@@ -47,11 +47,10 @@ async function processExpiryWarnings() {
         for (const days of warningDays) {
             // Users with subscription expiring in exactly `days` days
             const from = new Date(now);
-            from.setDate(from.getDate() + days - 1);
+            from.setDate(from.getDate() + days);
             from.setHours(0, 0, 0, 0);
 
-            const to = new Date(now);
-            to.setDate(to.getDate() + days);
+            const to = new Date(from);
             to.setHours(23, 59, 59, 999);
 
             const usersExpiringSoon = await User.find({

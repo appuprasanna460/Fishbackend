@@ -1,7 +1,8 @@
 const express = require('express');
 const router = express.Router();
 const notificationController = require('../controllers/notificationcontroller');
-const { authenticate, authorize } = require('../middleware/authmiddleware');
+const { authenticate } = require('../middleware/authmiddleware');
+const { authorize } = require('../middleware/rbacmiddleware');
 
 // All notification routes require authentication
 router.use(authenticate);
@@ -14,7 +15,7 @@ router.get('/my', notificationController.getMyNotifications);
 router.patch('/:id/read', notificationController.markAsRead);
 
 // ── Super Admin only routes ───────────────────────────────────────────────────
-router.use(authorize(['SUPER_ADMIN']));
+router.use(authorize('SUPER_ADMIN'));
 
 // GET all pending registrations and renewal requests
 router.get('/', notificationController.getNotifications);

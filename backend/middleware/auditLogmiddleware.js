@@ -47,16 +47,14 @@ const auditLog = async (req, res, next) => {
 
             // Determine if request was successful (2xx status)
             const isSuccess = res.statusCode >= 200 && res.statusCode < 300;
-
-            // Only log successful mutating operations
             if (!isSuccess) {
                 return;
             }
 
-            // Extract resource name from path
-            const pathParts = req.path.split('/').filter(p => p);
-            const resource = pathParts.length > 1 ? pathParts[1] : 'unknown';
-            const resourceId = pathParts.length > 2 ? pathParts[2] : null;
+            // Extract resource name from path skipping 'api' and 'exporter' prefix segments
+            const pathParts = req.path.split('/').filter(p => p && p !== 'api' && p !== 'exporter');
+            const resource = pathParts.length > 0 ? pathParts[0] : 'unknown';
+            const resourceId = pathParts.length > 1 ? pathParts[1] : null;
 
             // Map HTTP methods to actions
             const actionMap = {
@@ -65,18 +63,26 @@ const auditLog = async (req, res, next) => {
                 'PATCH': 'UPDATE',
                 'DELETE': 'DELETE'
             };
-
             const action = actionMap[req.method] || req.method;
+
+            // Prepare changes.after and redact sensitive fields
+            let afterState = parsedBody?.data ? JSON.parse(JSON.stringify(parsedBody.data)) : (parsedBody ? JSON.parse(JSON.stringify(parsedBody)) : null);
+            if (afterState && typeof afterState === 'object') {
+                delete afterState.password;
+                delete afterState.refreshTokens;
+                delete afterState.token;
+            }
 
             // Create audit log entry
             await AuditLog.create({
                 userId: req.user._id,
+                exporterId: req.user?.exporterId || null,
                 action,
                 resource: resource.charAt(0).toUpperCase() + resource.slice(1),
                 resourceId: resourceId || parsedBody?.data?.id || parsedBody?._id || null,
                 changes: {
                     before: null,
-                    after: parsedBody?.data || parsedBody || null
+                    after: afterState
                 },
                 ipAddress: req.ip || req.connection.remoteAddress,
                 userAgent: req.headers['user-agent'],

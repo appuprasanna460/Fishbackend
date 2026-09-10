@@ -29,16 +29,5 @@ const locationSchema = new mongoose.Schema({
 locationSchema.index({ name: 1 }, { unique: true });
 locationSchema.index({ isActive: 1 });
 
-// Pre-remove middleware
-locationSchema.pre('remove', async function (next) {
-    // Check if any sub-locations exist
-    const SubLocation = mongoose.model('SubLocation');
-    const count = await SubLocation.countDocuments({ locationId: this._id });
-    if (count > 0) {
-        next(new Error('Cannot delete location with existing sub-locations'));
-    }
-    next();
-});
-
 const Location = mongoose.model('Location', locationSchema);
 module.exports = Location;

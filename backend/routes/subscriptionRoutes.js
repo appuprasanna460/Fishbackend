@@ -2,7 +2,8 @@
 const express = require('express');
 const router = express.Router();
 const subscriptionController = require('../controllers/subscriptionController');
-const { authenticate, authorize } = require('../middleware/authmiddleware');
+const { authenticate } = require('../middleware/authmiddleware');
+const { authorize } = require('../middleware/rbacmiddleware');
 
 // All subscription routes require authentication
 router.use(authenticate);
@@ -25,7 +26,7 @@ router.post('/renewal', subscriptionController.createRenewalRequest);
 router.get('/billing-history', subscriptionController.getBillingHistory);
 
 // ── Super Admin only ──────────────────────────────────────────────────────────
-const adminOnly = authorize(['SUPER_ADMIN']);
+const adminOnly = authorize('SUPER_ADMIN');
 
 // GET all pending renewal requests
 router.get('/renewals', adminOnly, subscriptionController.getRenewalRequests);
