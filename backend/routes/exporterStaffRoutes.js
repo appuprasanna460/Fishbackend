@@ -2,7 +2,7 @@ const express = require('express');
 const router = express.Router();
 const multer = require('multer');
 const upload = multer({ storage: multer.memoryStorage() });
-const staffController = require('../controllers/staffController');
+const staffController = require('../controllers/staffcontroller');
 const { authenticateExporterUser, authorizeExporterRoles } = require('../middleware/exporterMiddleware');
 
 router.use(authenticateExporterUser);
