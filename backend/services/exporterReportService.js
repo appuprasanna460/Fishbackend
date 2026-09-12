@@ -153,6 +153,34 @@ const getLotTraceability = async (exporterId, lotId) => {
 };
 
 const getReceivablesAging = async (exporterId) => {
+    try {
+        const existingSales = await Sale.find({ exporterId, isDeleted: false, status: { $ne: 'CANCELLED' } });
+        for (const s of existingSales) {
+            const exists = await Receivable.findOne({ saleId: s._id, exporterId });
+            if (!exists) {
+                const total = s.netAmount || s.totalAmount || 0;
+                const paid = s.amountReceived || 0;
+                const bal = s.balanceAmount !== undefined ? s.balanceAmount : Math.max(0, total - paid);
+                await Receivable.create({
+                    exporterId,
+                    customerId: s.customerId || null,
+                    customerName: s.customerName,
+                    saleId: s._id,
+                    invoiceNumber: s.invoiceNumber || s.saleNumber,
+                    saleNumber: s.saleNumber,
+                    totalAmount: total,
+                    paidAmount: paid,
+                    balanceAmount: bal,
+                    dueDate: s.dueDate || s.saleDate,
+                    status: bal === 0 ? 'PAID' : 'PENDING',
+                    createdAt: s.createdAt || s.saleDate
+                });
+            }
+        }
+    } catch (err) {
+        console.error('Error auto-syncing receivables in getReceivablesAging:', err);
+    }
+
     const receivables = await Receivable.find({ exporterId, status: { $ne: 'PAID' } }).lean();
     const now = new Date();
 
@@ -195,6 +223,29 @@ const getReceivablesAging = async (exporterId) => {
 };
 
 const getPayablesAging = async (exporterId) => {
+    try {
+        const existingPurchases = await Purchase.find({ exporterId, isDeleted: false, status: { $ne: 'CANCELLED' } });
+        for (const p of existingPurchases) {
+            const exists = await Payable.findOne({ purchaseId: p._id, exporterId });
+            if (!exists) {
+                await Payable.create({
+                    exporterId,
+                    sellerId: p.sellerId || null,
+                    sellerName: p.sellerName,
+                    purchaseId: p._id,
+                    purchaseNumber: p.purchaseNumber,
+                    totalAmount: p.totalAmount,
+                    paidAmount: 0,
+                    balanceAmount: p.totalAmount,
+                    status: 'PENDING',
+                    createdAt: p.createdAt || p.purchaseDate
+                });
+            }
+        }
+    } catch (err) {
+        console.error('Error auto-syncing payables in getPayablesAging:', err);
+    }
+
     const payables = await Payable.find({ exporterId, status: { $ne: 'PAID' } }).lean();
     const now = new Date();
 

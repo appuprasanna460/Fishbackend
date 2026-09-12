@@ -166,6 +166,23 @@ exports.saveDraft = async (req, res, next) => {
 
         await purchase.save();
 
+        // Create Payable entry for seller
+        const existingPayable = await Payable.findOne({ purchaseId: purchase._id, exporterId });
+        if (!existingPayable) {
+            const payable = new Payable({
+                exporterId,
+                sellerId: purchase.sellerId || null,
+                sellerName: purchase.sellerName,
+                purchaseId: purchase._id,
+                purchaseNumber: purchase.purchaseNumber,
+                totalAmount: purchase.totalAmount,
+                paidAmount: 0,
+                balanceAmount: purchase.totalAmount,
+                status: 'PENDING'
+            });
+            await payable.save();
+        }
+
         res.status(201).json({ success: true, message: 'Draft purchase saved successfully', data: purchase });
     } catch (error) {
         next(error);

@@ -14,13 +14,64 @@ const getDashboard = async (exporterId) => {
     const endOfDay = new Date();
     endOfDay.setHours(23, 59, 59, 999);
 
-    // 1. Today Purchase Value
+    // 0. Auto-sync missing Payables & Receivables for consistency
+    try {
+        const existingPurchases = await Purchase.find({ exporterId, isDeleted: false, status: { $ne: 'CANCELLED' } });
+        for (const p of existingPurchases) {
+            const exists = await Payable.findOne({ purchaseId: p._id, exporterId });
+            if (!exists) {
+                await Payable.create({
+                    exporterId,
+                    sellerId: p.sellerId || null,
+                    sellerName: p.sellerName,
+                    purchaseId: p._id,
+                    purchaseNumber: p.purchaseNumber,
+                    totalAmount: p.totalAmount,
+                    paidAmount: 0,
+                    balanceAmount: p.totalAmount,
+                    status: 'PENDING',
+                    createdAt: p.createdAt || p.purchaseDate
+                });
+            }
+        }
+
+        const existingSales = await Sale.find({ exporterId, isDeleted: false, status: { $ne: 'CANCELLED' } });
+        for (const s of existingSales) {
+            const exists = await Receivable.findOne({ saleId: s._id, exporterId });
+            if (!exists) {
+                const total = s.netAmount || s.totalAmount || 0;
+                const paid = s.amountReceived || 0;
+                const bal = s.balanceAmount !== undefined ? s.balanceAmount : Math.max(0, total - paid);
+                await Receivable.create({
+                    exporterId,
+                    customerId: s.customerId || null,
+                    customerName: s.customerName,
+                    saleId: s._id,
+                    invoiceNumber: s.invoiceNumber || s.saleNumber,
+                    saleNumber: s.saleNumber,
+                    totalAmount: total,
+                    paidAmount: paid,
+                    balanceAmount: bal,
+                    dueDate: s.dueDate || s.saleDate,
+                    status: bal === 0 ? 'PAID' : 'PENDING',
+                    createdAt: s.createdAt || s.saleDate
+                });
+            }
+        }
+    } catch (err) {
+        console.error('Error auto-syncing payables/receivables in dashboard:', err);
+    }
+
+    // 1. Today Purchase Value (or Total Non-Cancelled Purchase Value if today is 0)
     const todayPurchases = await Purchase.aggregate([
         {
             $match: {
                 exporterId,
                 status: { $ne: 'CANCELLED' },
-                purchaseDate: { $gte: startOfDay, $lte: endOfDay }
+                $or: [
+                    { purchaseDate: { $gte: startOfDay, $lte: endOfDay } },
+                    { createdAt: { $gte: startOfDay, $lte: endOfDay } }
+                ]
             }
         },
         {
@@ -30,7 +81,27 @@ const getDashboard = async (exporterId) => {
             }
         }
     ]);
-    const todayPurchaseValue = todayPurchases.length > 0 ? todayPurchases[0].totalValue : 0;
+    let todayPurchaseValue = todayPurchases.length > 0 ? todayPurchases[0].totalValue : 0;
+
+    if (todayPurchaseValue === 0) {
+        const totalPurchasesAgg = await Purchase.aggregate([
+            {
+                $match: {
+                    exporterId,
+                    status: { $ne: 'CANCELLED' }
+                }
+            },
+            {
+                $group: {
+                    _id: null,
+                    totalValue: { $sum: '$totalAmount' }
+                }
+            }
+        ]);
+        if (totalPurchasesAgg.length > 0) {
+            todayPurchaseValue = totalPurchasesAgg[0].totalValue;
+        }
+    }
 
     // 2. Today Sales Value
     const todaySales = await Sale.aggregate([
@@ -38,7 +109,10 @@ const getDashboard = async (exporterId) => {
             $match: {
                 exporterId,
                 status: { $ne: 'CANCELLED' },
-                saleDate: { $gte: startOfDay, $lte: endOfDay }
+                $or: [
+                    { saleDate: { $gte: startOfDay, $lte: endOfDay } },
+                    { createdAt: { $gte: startOfDay, $lte: endOfDay } }
+                ]
             }
         },
         {
@@ -48,7 +122,27 @@ const getDashboard = async (exporterId) => {
             }
         }
     ]);
-    const todaySalesValue = todaySales.length > 0 ? todaySales[0].totalValue : 0;
+    let todaySalesValue = todaySales.length > 0 ? todaySales[0].totalValue : 0;
+
+    if (todaySalesValue === 0) {
+        const totalSalesAgg = await Sale.aggregate([
+            {
+                $match: {
+                    exporterId,
+                    status: { $ne: 'CANCELLED' }
+                }
+            },
+            {
+                $group: {
+                    _id: null,
+                    totalValue: { $sum: '$netAmount' }
+                }
+            }
+        ]);
+        if (totalSalesAgg.length > 0) {
+            todaySalesValue = totalSalesAgg[0].totalValue;
+        }
+    }
 
     // 3. Available Stock Kg + Active Lots Count
     const stockAgg = await Stock.aggregate([
@@ -90,7 +184,7 @@ const getDashboard = async (exporterId) => {
         {
             $match: {
                 exporterId,
-                status: { $in: ['PENDING', 'PARTIAL', 'OVERDUE'] }
+                status: { $ne: 'PAID' }
             }
         },
         {
@@ -107,7 +201,7 @@ const getDashboard = async (exporterId) => {
         {
             $match: {
                 exporterId,
-                status: { $in: ['PENDING', 'PART_PAID'] }
+                status: { $ne: 'PAID' }
             }
         },
         {

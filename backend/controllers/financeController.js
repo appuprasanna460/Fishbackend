@@ -121,6 +121,26 @@ exports.getPayables = async (req, res, next) => {
         if (sellerId) query.sellerId = sellerId;
         if (status && status !== 'ALL') query.status = status;
 
+        // Auto-sync missing payables for non-cancelled purchases
+        const existingPurchases = await Purchase.find({ exporterId, isDeleted: false, status: { $ne: 'CANCELLED' } });
+        for (const p of existingPurchases) {
+            const exists = await Payable.findOne({ purchaseId: p._id, exporterId });
+            if (!exists) {
+                await Payable.create({
+                    exporterId,
+                    sellerId: p.sellerId || null,
+                    sellerName: p.sellerName,
+                    purchaseId: p._id,
+                    purchaseNumber: p.purchaseNumber,
+                    totalAmount: p.totalAmount,
+                    paidAmount: 0,
+                    balanceAmount: p.totalAmount,
+                    status: 'PENDING',
+                    createdAt: p.createdAt || p.purchaseDate
+                });
+            }
+        }
+
         const payables = await Payable.find(query).sort({ createdAt: -1 });
 
         let totalAmount = 0;
